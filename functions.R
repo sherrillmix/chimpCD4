@@ -1,4 +1,7 @@
 library('rstan')
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
 envColors<-read.csv('envColor.csv',stringsAsFactors=FALSE)
 envColors$col<-sprintf('#%s',envColors$color)
 envCols<-structure(envColors$col,.Names=envColors$env)
@@ -81,10 +84,6 @@ stanCode2<-'
   }
 '
 mod2 <- stan_model(model_code = stanCode2)
-
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
-
 
 plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2)),cols=NULL){
   par(mfrow=c(2,ceiling(nrow(raw1)/2))) 
