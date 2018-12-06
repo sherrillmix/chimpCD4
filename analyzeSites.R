@@ -46,30 +46,39 @@ summary(glm(sites$siv[selector]~.+sites$isLBMB[selector],data=as.data.frame(dumm
 selector<-sites$Site.code %in% c('LB','MB','GM')
 colSelect<-apply(dummies2[selector,],2,sum)>0&apply(dummies2[selector,],2,sum)<sum(selector)
 #colSelect<-colSelect & !colnames(dummies2) %in% c('25_40_QQ','52_55_68_KVP')
-mod<-as.data.frame(coef(print(summary(glm(sites$siv[selector]~.+sites$isLBMB[selector],data=as.data.frame(dummies2[selector,colSelect]),family='binomial')))))
+glm_all<-glm(sites$siv[selector]~.+sites$isLBMB[selector],data=as.data.frame(dummies2[selector,colSelect]),family='binomial')
+mod<-as.data.frame(coef(print(summary(glm_all))))
+print(anova(glm_all,test='Chisq'))
 # LB/MB
 selector<-sites$Site.code %in% c('LB','MB') 
 colSelect<-apply(dummies[selector,],2,sum)>0&apply(dummies[selector,],2,sum)<sum(selector)
 #avoid convergence problem with small baseline
 #colSelect<-colSelect&colnames(dummies)!='nt51A'
-mod_LM<-as.data.frame(coef(print(summary(glm(sites$siv[selector]~.,data=as.data.frame(dummies[selector,colSelect]),family='binomial')))))
+glm_LM<-glm(sites$siv[selector]~.,data=as.data.frame(dummies[selector,colSelect]),family='binomial')
+print(anova(glm_LM,test='Chisq'))
+mod_LM<-as.data.frame(coef(print(summary(glm_LM))))
 # Gombe
 selector<-sites$Site.code %in% c('GM') 
 colSelect<-apply(dummies[selector,],2,sum)>0&apply(dummies[selector,],2,sum)<sum(selector)
 #colSelect<-colSelect&colnames(dummies)!='25Q'
-mod_G<-as.data.frame(coef(print(summary(glm(sites$siv[selector]~.,data=as.data.frame(dummies[selector,colSelect]),family='binomial')))))
+glm_G<-glm(sites$siv[selector]~.,data=as.data.frame(dummies[selector,colSelect]),family='binomial')
+print(anova(glm_G,test='Chisq'))
+mod_G<-as.data.frame(coef(print(summary(glm_G))))
 
 #LB/MB allele levels
 selector<-sites$Site.code %in% c('LB','MB')
 colSelect<-apply(dummies2[selector,],2,sum)>0&apply(dummies2[selector,],2,sum)<sum(selector)
 #colSelect<-colSelect & !colnames(dummies2) %in% c('nt51_A','52_55_68_KVP')
-mod_LM_a<-as.data.frame(coef(print(summary(glm(sites$siv[selector]~.,data=as.data.frame(dummies2[selector,colSelect]),family='binomial')))))
+glm_LM_a<-glm(sites$siv[selector]~.,data=as.data.frame(dummies2[selector,colSelect]),family='binomial')
+print(anova(glm_LM_a,test='Chisq'))
+mod_LM_a<-as.data.frame(coef(print(summary(glm_LM_a))))
 #Gombe allele level
 selector<-sites$Site.code %in% c('GM')
 colSelect<-apply(dummies2[selector,],2,sum)>0&apply(dummies2[selector,],2,sum)<sum(selector)
 #colSelect<-colSelect & !colnames(dummies2) %in% c('25_40_QQ')
-mod_G_a<-as.data.frame(coef(print(summary(glm(sites$siv[selector]~.,data=as.data.frame(dummies2[selector,colSelect]),family='binomial')))))
-
+glm_G_a<-glm(sites$siv[selector]~.,data=as.data.frame(dummies2[selector,colSelect]),family='binomial')
+print(anova(glm_G_a,test='Chisq'))
+mod_G_a<-as.data.frame(coef(print(summary(glm_G_a))))
 
 
 cleanNames<-function(xx)sub('nt51-?G','nt51g',sub('nt51-?A','nt51a',gsub('_','-',sub('sites\\$isLBMB\\[selector\\]','inLBMB',gsub('`','',sub("TRUE",'',rownames(xx)))))))
@@ -154,7 +163,7 @@ mtext('Exon 3',2,cex=.7,line=2,at=mean(exon3))
 dev.off()
 
 pdf('glm3.pdf',height=2,width=3.42)
-par(mar=c(3.5,2.1,2,0.2),mfrow=c(1,4))
+par(mar=c(3.5,2.2,2,0.3),mfrow=c(1,4))
 plotGlm(mod_G[!grepl('Intercept',rownames(mod_G)),],main='Gombe polymorphism',xlim=xlim,xlab='',cex.axis=.7)
 plotGlm(mod_G_a[!grepl('Intercept',rownames(mod_G_a)),],main='Gombe allele',xlim=xlim,xlab='',cex.axis=.7)
 plotGlm(mod_LM[!grepl('Intercept',rownames(mod_LM)),],main='Lobéké/Manbélé polymorphism',xlim=xlim,xpd=NA,cex.axis=.7)
