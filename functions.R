@@ -121,6 +121,117 @@ stanCode3<-'
 '
 mod3 <- stan_model(model_code = stanCode3)
 
+stanCode4<-'
+  data {
+    int<lower=0> nEnv;
+    int<lower=0> nRep;
+    matrix<lower=0,upper=1>[nEnv,nRep] prop1;
+    matrix<lower=0,upper=1>[nEnv,nRep] prop2;
+  }
+  parameters {
+    real metaFoldChange;
+    real<lower=0> metaSd;
+    vector[nRep] prop1BaseRaw[nEnv];
+    vector[nEnv] metaRaw;
+    real<lower=0> sigma;
+    vector[nRep-1] repEffect;
+    real<lower=0> baseSigma;
+    real baseMu[nEnv];
+    matrix<upper=0>[nEnv,nRep] back1;
+    matrix<upper=0>[nEnv,nRep] back2;
+    matrix[nEnv,nRep] trueProp1Raw;
+    matrix[nEnv,nRep] trueProp2Raw;
+    matrix<lower=2000>[nEnv,nRep] nCells1;
+    matrix<lower=2000>[nEnv,nRep] nCells2;
+  }
+  transformed parameters{
+    vector[nEnv] foldChange;
+    vector[nRep] repEffectPlusZero;
+    vector[nRep] prop1Base[nEnv];
+    matrix<lower=0,upper=1>[nEnv,nRep] propPlusBack1;
+    matrix<lower=0,upper=1>[nEnv,nRep] propPlusBack2;
+    foldChange=metaFoldChange+metaRaw*metaSd;
+    repEffectPlusZero[1]=0;
+    repEffectPlusZero[2:nRep]=repEffect[1:(nRep-1)];
+    for(ii in 1:nEnv){
+      prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
+      propPlusBack1[ii,]=inv_logit(trueProp1Raw[ii,]*sigma+to_row_vector(prop1Base[ii]))+inv_logit(back1[ii,]);
+      propPlusBack2[ii,]=inv_logit(trueProp2Raw[ii,]*sigma+to_row_vector(prop1Base[ii])+foldChange[ii])+inv_logit(back2[ii,]);
+      for(jj in 1:nRep){
+        propPlusBack1[ii,jj]=fmin(propPlusBack1[ii,jj],.9999);
+        propPlusBack2[ii,jj]=fmin(propPlusBack2[ii,jj],.9999);
+      }
+    }
+  }
+  model {
+    baseSigma~gamma(1,.1);
+    sigma~gamma(1,.1);
+    metaRaw~normal(0,1);
+    for(ii in 1:nEnv){
+      prop1BaseRaw[ii]~normal(0,1);
+      //trueProp1[ii,]~normal(prop1Base[ii],sigma);
+      //trueProp2[ii,]~normal(prop1Base[ii]+foldChange[ii],sigma);
+      trueProp1Raw[ii,]~normal(0,1);
+      trueProp2Raw[ii,]~normal(0,1);
+      back1[ii,]~normal(-6.43,.97);
+      back2[ii,]~normal(-6.43,.97);
+      nCells1[ii,]~normal(5000,750);
+      nCells2[ii,]~normal(5000,750);
+      prop1[ii,]~normal(propPlusBack1[ii,],sqrt(propPlusBack1[ii,].*(1-propPlusBack1[ii,])./nCells1[ii,]));
+      prop2[ii,]~normal(propPlusBack2[ii,],sqrt(propPlusBack2[ii,].*(1-propPlusBack2[ii,])./nCells2[ii,]));
+    }
+  }
+'
+stanCode5<-'
+  data {
+    int<lower=0> nEnv;
+    int<lower=0> nRep;
+    //matrix<lower=0,upper=1>[nEnv,nRep] prop1;
+    //matrix<lower=0,upper=1>[nEnv,nRep] prop2;
+    matrix[nEnv,nRep] prop1;
+    matrix[nEnv,nRep] prop2;
+  }
+  parameters {
+    real metaFoldChange;
+    real<lower=0> metaSd;
+    vector[nRep] prop1BaseRaw[nEnv];
+    vector[nEnv] metaRaw;
+    real<lower=0> sigma;
+    vector[nRep-1] repEffect;
+    real<lower=0> baseSigma;
+    real baseMu[nEnv];
+    matrix<upper=0>[nEnv,nRep] back1;
+    matrix<upper=0>[nEnv,nRep] back2;
+  }
+  transformed parameters{
+    vector[nEnv] foldChange;
+    vector[nRep] repEffectPlusZero;
+    vector[nRep] prop1Base[nEnv];
+    matrix<lower=0>[nEnv,nRep] multBack1;
+    matrix<lower=0>[nEnv,nRep] multBack2;
+    foldChange=metaFoldChange+metaRaw*metaSd;
+    repEffectPlusZero[1]=0;
+    repEffectPlusZero[2:nRep]=repEffect[1:(nRep-1)];
+    for(ii in 1:nEnv){
+      prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
+      multBack1[ii,]=log((exp(back1[ii,])+exp(to_row_vector(prop1Base[ii])))./exp(to_row_vector(prop1Base[ii])));
+      multBack2[ii,]=log((exp(back2[ii,])+exp(to_row_vector(prop1Base[ii]+foldChange[ii])))./exp(to_row_vector(prop1Base[ii]+foldChange[ii])));
+    }
+  }
+  model {
+    for(ii in 1:nEnv){
+      prop1BaseRaw[ii]~normal(0,1);
+      prop1[ii,]~normal(prop1Base[ii]+to_vector(multBack1[ii,]),sigma);
+      prop2[ii,]~normal(prop1Base[ii]+foldChange[ii]+to_vector(multBack2[ii,]),sigma);
+      back1[ii,]~normal(-6.43,.97);
+      back2[ii,]~normal(-6.43,.97);
+    }
+    metaRaw~normal(0,1);
+  }
+'
+mod4 <- stan_model(model_code = stanCode5)
+
+
 
 plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2)),cols=NULL){
   par(mfrow=c(2,ceiling(nrow(raw1)/2))) 
@@ -189,17 +300,54 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
   if(!is.null(special))abline(h=max(which(colnames(selects)%in% special))-.5)
 }
 
-compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL){
+compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL,logFunc=log,chains=50,...){
   message(allele1,' - ',allele2)
   dat=list(
     nEnv=nrow(dat1),
     nRep=3,
-    prop1=log(dat1[,grep(sprintf('^%s [0-9]+$',allele1),colnames(dat1))]/100),
-    prop2=log(dat2[,grep(sprintf('^%s [0-9]+$',allele2),colnames(dat2))]/100)
+    prop1=logFunc(dat1[,grep(sprintf('^%s [0-9]+$',allele1),colnames(dat1))]/100),
+    prop2=logFunc(dat2[,grep(sprintf('^%s [0-9]+$',allele2),colnames(dat2))]/100)
   )
   if(!is.null(wtPar))dat<-c(dat,list('wtMu'=wtPar[1],'wtSd'=wtPar[2]))
-  fit <- sampling(mod, data = dat, iter=50000, chains=30,thin=25,control=list(adapt_delta=.9))
+  fit <- sampling(mod, data = dat, iter=20000, chains=chains,thin=2,control=list(adapt_delta=.9),...)
 }
 
 
+stanCodeSites<-'
+  data {
+    int<lower=0> nChimp;
+    int<lower=0> nSites;
+    int<lower=0> nAllele;
+    int<lower=0,upper=1> siv[nChimp];
+    int<lower=0,upper=nSites> sites[nChimp];
+    matrix<lower=0,upper=1>[nChimp,nAllele] alleles;
+  }
+  parameters {
+    vector[nSites] siteIntercepts;
+    vector[nAllele] alleleBetas;
+    real<lower=0> shrinkage;
+  }
+  transformed parameters{
+  }
+  model {
+    siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
+    alleleBetas~double_exponential(0,shrinkage);
+    siteIntercepts~normal(0,10);
+    shrinkage~gamma(1,.1);
+  }
+'
+modSites <- stan_model(model_code = stanCodeSites)
 
+analyzeSites<-function(siv,sites,alleles,chains=20,...){
+  if(length(siv)!=length(sites)||length(siv)!=nrow(alleles))stop('Length differences in chimps and sites')
+  siteNum<-as.numeric(as.factor(sites))
+  dat<-list(
+    nChimp=length(siv),
+    nSites=max(siteNum),
+    nAllele=ncol(alleles),
+    siv=siv*1,
+    sites=siteNum,
+    alleles=alleles*1
+  )
+  fit <- sampling(modSites, data = dat, iter=40000, chains=chains,thin=4,control=list(adapt_delta=.9),...)
+}
