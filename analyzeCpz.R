@@ -12,16 +12,29 @@ rownames(cpz)<-cpz$env
 cpz<-cpz[dnar::orderIn(rownames(cpz),names(envCols)),]
 
 
-pairs<-list(c('Human','QQNVP'),c('QQNVP','QQNVT'),c('Human','QQKVP'),c('QQKVP','QQKVT'),c('QQNVP','RQNVP'),c('QQNVP','QRNVP'),c('QQNIP','QRNIP'),c('QQKVT','QRKVT'),c('QQNVP','QQKVP'),c('QQNVT','QQKVT'),c('QQNVP','QQNIP'),c('QRNVP','QRNIP'))
+pairs<-list(c('Human','QQNVP'),c('QQNVP','QQNVT'),c('Human','QQKVP'),c('QQKVP','QQKVT'),c('QQNVP','RQNVP'),c('QQNVP','QRNVP'),c('QQNIP','QRNIP'),c('QQKVT','QRKVT'),c('QQNVP','QQKVP'),c('QQNVT','QQKVT'),c('QQNVP','QQNIP'),c('QRNVP','QRNIP'),c('Human','QQNVT'))
+
+sameScale<-c('QQNVP-RQNVP','QQNVP-QRNVP','QQNIP-QRNIP','QQKVT-QRKVT')
 
 if(!exists('selectFits')){
   selectFits<-lapply(pairs,function(pair)compareAlleles(mod,pair[1],pair[2],cpz))
   names(selectFits)<-sapply(pairs,paste,collapse='-')
 }
 
-xlims<-exp(range(unlist(lapply(selectFits,findLims))))
+xlims<-exp(range(unlist(lapply(selectFits[names(selectFits) %in% sameScale],findLims))))
+xlims2<-exp(range(unlist(lapply(selectFits[!names(selectFits) %in% sameScale],findLims))))
 dummy<-lapply(names(selectFits),function(xx){message(xx);print(selectFits[[xx]],pars=c('metaFoldChange','foldChange','repEffect'))})
-pdf('cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=xx,cols=envCols,xlims=xlims));dev.off()
+#pdf('cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=sub('-','/',xx),cols=envCols,xlims=xlims));dev.off()
+pdf('cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=sub('-','/',xx),cols=NULL,xlims=if(xx %in% sameScale)xlims else xlims2));dev.off()
 pdf('cpzRaw.pdf',width=8,height=6);par(mar=c(3,4,1,.2));lapply(pairs,function(xx)plotRaw(cpz[,grep(xx[1],colnames(cpz))],cpz[,grep(xx[2],colnames(cpz))],cols=envCols));dev.off()
 
 
+apply(as.matrix(selectFits[['Human-QQNVP']])[,c('metaFoldChange','metaSd')],2,mean)
+apply(as.matrix(selectFits[['QQNVP-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
+apply(as.matrix(selectFits[['Human-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
+
+stats<-lapply(names(selectFits),function(xx){
+  out<-assignNames(pullRanges(selectFits[[xx]]),rownames(cpz))
+  data.frame('comparison'=xx,'stat'=rownames(out),out)
+})
+names(stats)<-names(selectFits)

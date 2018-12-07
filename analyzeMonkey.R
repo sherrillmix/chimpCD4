@@ -30,12 +30,13 @@ if(!exists('selectFits')){
 
 xlims<-exp(range(unlist(lapply(selectFits,findLims))))
 dummy<-lapply(names(selectFits),function(xx){message(xx);print(selectFits[[xx]],pars=c('metaFoldChange','foldChange'))})
-pdf('monkeyFits.pdf',width=4,height=4)
+pdf('out/monkeyFits.pdf',width=4,height=4)
 par(mar=c(3.5,8,2,.4))
 lapply(names(selectFits),function(xx){
   if(sum(grepl('foldChange',colnames(as.matrix(selectFits[[xx]]))))==9)envNames<-rownames(monkey1)
   else envNames<-rownames(monkey2)
-  plotFit(selectFits[[xx]],envNames,main=xx,cols=envCols,xlims=xlims)
+  #plotFit(selectFits[[xx]],envNames,main=sub('-','/',xx),cols=envCols,xlims=xlims)
+  plotFit(selectFits[[xx]],envNames,main=sub('-','/',xx),cols=NULL,xlims=xlims)
   #regex1<-sprintf('%s [0-9]+',strsplit(xx,'-')[[1]][1])
   #regex2<-sprintf('%s [0-9]+',strsplit(xx,'-')[[1]][2])
   #in1<-c(any(grepl(regex1,colnames(monkey1))),any(grepl(regex1,colnames(monkey2))))
@@ -48,7 +49,7 @@ lapply(names(selectFits),function(xx){
 })
 dev.off()
 
-pdf('monkeyRaw.pdf',width=10,height=6)
+pdf('out/monkeyRaw.pdf',width=10,height=6)
 par(mar=c(3,4,1,.2))
 lapply(pairs,function(xx){
   message(xx[1],'-',xx[2])
@@ -62,6 +63,18 @@ lapply(pairs,function(xx){
   plotRaw(dat1[,grepl(regex1,colnames(dat1))],dat2[,grepl(regex2,colnames(dat2))],cols=envCols)
 })
 dev.off()
+
+stats<-lapply(names(selectFits),function(xx){
+  if(sum(grepl('foldChange',colnames(as.matrix(selectFits[[xx]]))))==9)envNames<-rownames(monkey1)
+  else envNames<-rownames(monkey2)
+  out<-assignNames(pullRanges(selectFits[[xx]]),envNames)
+  data.frame('comparison'=xx,'stat'=rownames(out),out)
+})
+nCols<-sapply(stats,ncol)
+for(ii in unique(nCols)){
+  out<-do.call(rbind,stats[nCols==ii])
+  write.csv(out,sprintf('out/monkeyStats_%d.csv',ii-2),row.names=FALSE)
+}
 
 #allFits<-lapply(uniqAlleles,function(allele1){
   #lapply(uniqAlleles,compareAlleles,allele1)
