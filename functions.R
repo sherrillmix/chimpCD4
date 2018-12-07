@@ -1,4 +1,5 @@
 library('rstan')
+if(!dir.exists('out'))dir.create('out')
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
@@ -85,6 +86,42 @@ stanCode2<-'
 '
 mod2 <- stan_model(model_code = stanCode2)
 
+stanCode3<-'
+  data {
+    int<lower=0> nEnv;
+    int<lower=0> nRep;
+    matrix[nEnv,nRep] prop1;
+    matrix[nEnv,nRep] prop2;
+    real wtSd;
+    real wtMu;
+  }
+  parameters {
+    real metaFoldChange;
+    real<lower=0> metaSd;
+    real prop1Base[nEnv];
+    vector[nEnv-1] metaRaw;
+    real<lower=0> sigma;
+    real wtFoldChange;
+  }
+  transformed parameters{
+    vector[nEnv] foldChange;
+    foldChange[1]=wtFoldChange;
+    foldChange[2:nEnv]=metaFoldChange+metaRaw*metaSd;
+  }
+  model {
+    prop1[1,]~normal(prop1Base[1],sigma);
+    prop2[1,]~normal(prop1Base[1]+foldChange[1],sigma);
+    for(ii in 2:nEnv){
+      prop1[ii,]~normal(prop1Base[ii],sigma);
+      prop2[ii,]~normal(prop1Base[ii]+foldChange[1]+foldChange[ii],sigma);
+    }
+    metaRaw~normal(0,1);
+    wtFoldChange~normal(wtMu,wtSd);
+  }
+'
+mod3 <- stan_model(model_code = stanCode3)
+
+
 plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2)),cols=NULL){
   par(mfrow=c(2,ceiling(nrow(raw1)/2))) 
   notInCols<-rownames(raw1)[!rownames(raw1) %in% names(cols)]
@@ -101,13 +138,32 @@ plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$
 }
 
 findLims<-function(fit){
-  mat<-as.matrix(fit)
-  stats<-apply(mat,2,function(xx)c('lower'=unname(quantile(xx,c(.025))),'upper'=unname(quantile(xx,c(.975)))))
+  stats<-pullRanges(fit)
   selects<-stats[,grep('foldChange|metaFoldChange\\[',colnames(stats))]
   return(range(selects))
 }
+pullRanges<-function(fit){
+  mat<-as.matrix(fit)
+  stats<-apply(mat,2,function(xx)c('mean'=mean(xx),'lower'=unname(quantile(xx,c(.025))),'upper'=unname(quantile(xx,c(.975))),'p'=findCredLim(xx)))
+  return(stats)
+}
+findCredLim<-function(xx,target=0,tol=min(1/length(xx)/10,.001)){
+  p<-optimize(function(quant)abs(quantile(xx,quant)-target),c(0,1),tol=tol)$minimum
+  if(p>.5)p<-1-p
+  p<-max(p*2,1/length(xx))
+  return(p)
+}
 
-plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,selects)))){
+assignNames<-function(stats,virus){
+  stats<-stats[,grep('foldChange|metaFoldChange\\[',colnames(stats))]
+  foldIds<-grep('foldChange',colnames(stats))
+  nums<-as.numeric(sub('.*\\[([0-9]+)\\]','\\1',colnames(stats)[foldIds]))
+  colnames(stats)[foldIds]<-virus[nums]
+  colnames(stats)[colnames(stats)=='metaFoldChange']<-'Overall'
+  return(stats)
+}
+
+plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,selects))),special=NULL,xlab='Fold change'){
   mat<-as.matrix(fit)
   stats<-apply(mat,2,function(xx)c('mean'=mean(xx),'lower'=unname(quantile(xx,c(.025))),'upper'=unname(quantile(xx,c(.975)))))
   #selects<-exp(stats[,grep('foldChange|metaFoldChange|repEffect\\[',colnames(stats))])
@@ -119,9 +175,10 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
   colnames(selects)[colnames(selects)=='repEffect[1]']<-'Replicate 2'
   colnames(selects)[colnames(selects)=='repEffect[2]']<-'Replicate 3'
   selects<-selects[,ncol(selects):1]
+  if(!is.null(special))selects<-selects[,order(colnames(selects) %in% special)]
   notInCols<-colnames(selects)[!colnames(selects) %in% names(cols)]
   cols<-c(cols,structure(rep('black',length(notInCols)),.Names=notInCols))
-  plot(1,1,ylim=c(1,ncol(selects)),xlim=xlims,log='x',type='n',ylab='',xlab='Fold change',main=main,yaxt='n',xaxt='n',mgp=c(2.5,.8,0))
+  plot(1,1,ylim=c(1,ncol(selects)),xlim=xlims,log='x',type='n',ylab='',xlab=xlab,main=main,yaxt='n',xaxt='n',mgp=c(2.5,.8,0),bty='l')
   axis(2,1:ncol(selects),colnames(selects),las=1)
   segments(selects['lower',],1:ncol(selects),selects['upper',],1:ncol(selects))
   points(selects['mean',],1:ncol(selects),pch=21,bg=cols[colnames(selects)])
@@ -129,9 +186,10 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
   if(xlims[2]<3&xlims[1]>.1)axis(1,.5)
   if(xlims[2]<10&xlims[1]>.5)axis(1,.7)
   abline(v=1,lty=3)
+  if(!is.null(special))abline(h=max(which(colnames(selects)%in% special))-.5)
 }
 
-compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1){
+compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL){
   message(allele1,' - ',allele2)
   dat=list(
     nEnv=nrow(dat1),
@@ -139,6 +197,7 @@ compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1){
     prop1=log(dat1[,grep(sprintf('^%s [0-9]+$',allele1),colnames(dat1))]/100),
     prop2=log(dat2[,grep(sprintf('^%s [0-9]+$',allele2),colnames(dat2))]/100)
   )
+  if(!is.null(wtPar))dat<-c(dat,list('wtMu'=wtPar[1],'wtSd'=wtPar[2]))
   fit <- sampling(mod, data = dat, iter=50000, chains=30,thin=25,control=list(adapt_delta=.9))
 }
 
