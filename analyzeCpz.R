@@ -19,6 +19,33 @@ sameScale<-c('QQNVP-RQNVP','QQNVP-QRNVP','QQNIP-QRNIP','QQKVT-QRKVT')
 if(!exists('selectFits')){
   selectFits<-lapply(pairs,function(pair)compareAlleles(mod,pair[1],pair[2],cpz))
   names(selectFits)<-sapply(pairs,paste,collapse='-')
+  initF<-function(xx){
+    out<-list(  
+      metaFoldChange=0,
+      metaSd=.1,
+      prop1BaseRaw=matrix(rep(-2,3*nrow(cpz)),nrow=nrow(cpz)),
+      metaRaw=rep(-1,nrow(cpz)),
+      sigma=.1,
+      repEffect=c(0,0),
+      baseSigma=.1,
+      baseMu=rep(-1,nrow(cpz)),
+      back1=matrix(rnorm(3*nrow(cpz),-6.5,1),nrow=nrow(cpz)),
+      back2=matrix(rnorm(3*nrow(cpz),-6.5,1),nrow=nrow(cpz)),
+      trueProp1Raw=matrix(rnorm(3*nrow(cpz),0,1),nrow=nrow(cpz)),
+      trueProp2Raw=matrix(rnorm(3*nrow(cpz),0,1),nrow=nrow(cpz)),
+      nCells1=matrix(rnorm(3*nrow(cpz),5000,750),nrow=nrow(cpz)),
+      nCells2=matrix(rnorm(3*nrow(cpz),5000,750),nrow=nrow(cpz))
+    )
+      #//propPlusBack1[ii,]=exp(trueProp1Raw[ii,]*sigma+to_row_vector(prop1Base[ii]))+exp(back1[ii,]);
+      #//prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
+    warning(paste(c(exp(zz$trueProp1Raw[1,]*zz$sigma+zz$prop1BaseRaw[[1]])+exp(zz$back1[1,])),collapse=' '))
+    out
+  }
+
+  selectFits2<-lapply(pairs[1],function(pair)compareAlleles(mod4,pair[1],pair[2],cpz,logFunc=function(xx)xx))
+      
+      
+  names(selectFits2)<-sapply(pairs,paste,collapse='-')
 }
 
 xlims<-exp(range(unlist(lapply(selectFits[names(selectFits) %in% sameScale],findLims))))
