@@ -207,3 +207,16 @@ selector<-sites$Site.code %in% c('LB','MB','GM')
 do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies2[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies3[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 
+
+selector<-sites$Site.code %in% c('LB','MB')
+allDummies<-cbind(dummies,dummies2,dummies3)
+#allDummies<-cbind(dummies3)
+colnames(allDummies)<-sub('25_40_|52_55_68_','',colnames(allDummies))
+colSelect<-apply(allDummies[selector,],2,sum)>0&apply(allDummies[selector,],2,sum)<sum(selector)&!colnames(allDummies) %in% ancestral
+dummySub<-allDummies[selector,colSelect]
+identicalColumns<-cutree(hclust(dist(t(dummySub))),h=0)
+newNames<-ave(colnames(dummySub),identicalColumns,FUN=function(xx)paste(xx,collapse='_'))
+dummySub<-dummySub[,!duplicated(newNames)]
+colnames(dummySub)<-newNames[!duplicated(newNames)]
+
+siteFit2<-analyzeSites(sites[selector,'siv'],factor(ifelse(sites[selector,'isLBMB'],'LBMB','GM'),level=c('LBMB','GM')),dummySub)
