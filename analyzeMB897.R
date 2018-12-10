@@ -15,6 +15,11 @@ if(!exists('selectFits')){
     compareAlleles(mod3,pair[1],pair[2],mb,wtPar=wtMuSd)
   })
   names(selectFits)<-sapply(pairs,paste,collapse='-')
+  selectFits2<-lapply(pairs,function(pair){
+    wtMuSd<-wtPar[[paste(pair,collapse='-')]]
+    compareAlleles(mod6,pair[1],pair[2],mb,wtPar=wtMuSd)
+  })
+  names(selectFits2)<-sapply(pairs,paste,collapse='-')
 }
 
 xlims<-exp(range(unlist(lapply(selectFits,findLims))))
