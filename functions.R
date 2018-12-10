@@ -199,9 +199,11 @@ stanCode5<-'
     real<lower=0> sigma;
     vector[nRep-1] repEffect;
     real<lower=0> baseSigma;
-    real baseMu[nEnv];
+    real baseMuRaw[nEnv];
     matrix<upper=0>[nEnv,nRep] back1;
     matrix<upper=0>[nEnv,nRep] back2;
+    real metaBase;
+    real<lower=0>metaBaseSd;
   }
   transformed parameters{
     vector[nEnv] foldChange;
@@ -213,7 +215,7 @@ stanCode5<-'
     repEffectPlusZero[1]=0;
     repEffectPlusZero[2:nRep]=repEffect[1:(nRep-1)];
     for(ii in 1:nEnv){
-      prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
+      prop1Base[ii]=metaBase+metaBaseSd*baseMuRaw[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
       multBack1[ii,]=log((exp(back1[ii,])+exp(to_row_vector(prop1Base[ii])))./exp(to_row_vector(prop1Base[ii])));
       multBack2[ii,]=log((exp(back2[ii,])+exp(to_row_vector(prop1Base[ii]+foldChange[ii])))./exp(to_row_vector(prop1Base[ii]+foldChange[ii])));
     }
@@ -226,10 +228,120 @@ stanCode5<-'
       back1[ii,]~normal(-6.43,.97);
       back2[ii,]~normal(-6.43,.97);
     }
+    baseMuRaw~normal(0,1);
     metaRaw~normal(0,1);
+    sigma~gamma(1,.1);
+    baseSigma~gamma(1,.1);
+    metaSd~gamma(1,.1);
   }
 '
 mod4 <- stan_model(model_code = stanCode5)
+
+stanCode6<-'
+  data {
+    int<lower=0> nEnv;
+    int<lower=0> nRep;
+    matrix[nEnv,nRep] prop1;
+    matrix[nEnv,nRep] prop2;
+  }
+  parameters {
+    real metaFoldChange;
+    real<lower=0> metaSd;
+    real prop1BaseRaw[nEnv];
+    vector[nEnv] metaRaw;
+    real<lower=0> sigma;
+    vector[nRep-1] repEffect1;
+    vector[nRep-1] repEffect2;
+    matrix<upper=0>[nEnv,nRep] back1;
+    matrix<upper=0>[nEnv,nRep] back2;
+    real metaBase;
+    real<lower=0>metaBaseSd;
+    real baseMuRaw[nEnv];
+    real<lower=0> baseSigma;
+  }
+  transformed parameters{
+    vector[nEnv] foldChange;
+    vector[nRep] repEffectPlusZero1;
+    vector[nRep] repEffectPlusZero2;
+    vector[nRep] prop1Base[nEnv];
+    vector[nRep] prop2Base[nEnv];
+    matrix<lower=0>[nEnv,nRep] multBack1;
+    matrix<lower=0>[nEnv,nRep] multBack2;
+    foldChange=metaFoldChange+metaRaw*metaSd;
+    repEffectPlusZero1[1]=0;
+    repEffectPlusZero1[2:nRep]=repEffect1;
+    repEffectPlusZero2[1]=0;
+    repEffectPlusZero2[2:nRep]=repEffect2;
+    for(ii in 1:nEnv){
+      prop1Base[ii]=metaBase+metaBaseSd*baseMuRaw[ii]+repEffectPlusZero1+prop1BaseRaw[ii]*baseSigma;
+      prop2Base[ii]=metaBase+metaBaseSd*baseMuRaw[ii]+repEffectPlusZero2+prop1BaseRaw[ii]*baseSigma+foldChange[ii];
+      multBack1[ii,]=log((exp(back1[ii,])+exp(to_row_vector(prop1Base[ii])))./exp(to_row_vector(prop1Base[ii])));
+      multBack2[ii,]=log((exp(back2[ii,])+exp(to_row_vector(prop2Base[ii])))./exp(to_row_vector(prop2Base[ii])));
+    }
+  }
+  model {
+    for(ii in 1:nEnv){
+      prop1BaseRaw[ii]~normal(0,1);
+      prop1[ii,]~normal(prop1Base[ii]+to_vector(multBack1[ii,]),sigma);
+      prop2[ii,]~normal(prop2Base[ii]+to_vector(multBack2[ii,]),sigma);
+      back1[ii,]~normal(-6.43,.97);
+      back2[ii,]~normal(-6.43,.97);
+    }
+    baseMuRaw~normal(0,1);
+    metaRaw~normal(0,1);
+    sigma~gamma(1,.1);
+    baseSigma~gamma(1,.1);
+    metaSd~gamma(1,.1);
+  }
+'
+mod5 <- stan_model(model_code = stanCode6)
+
+stanCode7<-'
+  data {
+    int<lower=0> nEnv;
+    int<lower=0> nRep;
+    matrix[nEnv,nRep] prop1;
+    matrix[nEnv,nRep] prop2;
+    real wtSd;
+    real wtMu;
+  }
+  parameters {
+    real metaFoldChange;
+    real<lower=0> metaSd;
+    real prop1Base[nEnv];
+    vector[nEnv-1] metaRaw;
+    real<lower=0> sigma;
+    real wtFoldChange;
+    matrix<upper=0>[nEnv,nRep] back1;
+    matrix<upper=0>[nEnv,nRep] back2;
+  }
+  transformed parameters{
+    vector[nEnv] foldChange;
+    matrix<lower=0>[nEnv,nRep] multBack1;
+    matrix<lower=0>[nEnv,nRep] multBack2;
+    foldChange[1]=wtFoldChange;
+    foldChange[2:nEnv]=metaFoldChange+metaRaw*metaSd;
+    for(ii in 1:nEnv){
+      multBack1[ii,]=log((exp(back1[ii,])+exp(prop1Base[ii]))./exp(prop1Base[ii]));
+      multBack2[ii,]=log((exp(back2[ii,])+exp(prop1Base[ii]+foldChange[1]+foldChange[ii]))./exp(prop1Base[ii]+foldChange[1]+foldChange[ii]));
+    }
+  }
+  model {
+    prop1[1,]~normal(prop1Base[1]+multBack1[1,],sigma);
+    prop2[1,]~normal(prop1Base[1]+foldChange[1]+multBack2[1,],sigma);
+    for(ii in 2:nEnv){
+      prop1[ii,]~normal(prop1Base[ii]+multBack1[ii,],sigma);
+      prop2[ii,]~normal(prop1Base[ii]+foldChange[1]+foldChange[ii]+multBack2[ii,],sigma);
+      back1[ii,]~normal(-6.43,.97);
+      back2[ii,]~normal(-6.43,.97);
+    }
+    metaRaw~normal(0,1);
+    wtFoldChange~normal(wtMu,wtSd);
+  }
+'
+mod6 <- stan_model(model_code = stanCode7)
+
+
 
 
 
@@ -253,9 +365,9 @@ findLims<-function(fit){
   selects<-stats[,grep('foldChange|metaFoldChange\\[',colnames(stats))]
   return(range(selects))
 }
-pullRanges<-function(fit){
+pullRanges<-function(fit,convertFunc=function(yy)yy){
   mat<-as.matrix(fit)
-  stats<-apply(mat,2,function(xx)c('mean'=mean(xx),'lower'=unname(quantile(xx,c(.025))),'upper'=unname(quantile(xx,c(.975))),'p'=findCredLim(xx)))
+  stats<-apply(mat,2,function(xx)c('mean'=convertFunc(mean(xx)),'lower'=convertFunc(unname(quantile(xx,c(.025)))),'upper'=convertFunc(unname(quantile(xx,c(.975)))),'p'=findCredLim(xx)))
   return(stats)
 }
 findCredLim<-function(xx,target=0,tol=min(1/length(xx)/10,.001)){
@@ -296,6 +408,11 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
   dnar::logAxis(1)
   if(xlims[2]<3&xlims[1]>.1)axis(1,.5)
   if(xlims[2]<10&xlims[1]>.5)axis(1,.7)
+  lowerBound<-par('usr')[1]
+  lows<-selects['lower',]<10^(lowerBound)
+  if(any(lows)){
+    for(ii in which(lows))polygon(c(10^(lowerBound),rep(10^(lowerBound+diff(par('usr')[1:2])*.04),2)),c(ii,ii+.1,ii-.1),col='black')
+  }
   abline(v=1,lty=3)
   if(!is.null(special))abline(h=max(which(colnames(selects)%in% special))-.5)
 }
@@ -309,7 +426,7 @@ compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL,logFunc=l
     prop2=logFunc(dat2[,grep(sprintf('^%s [0-9]+$',allele2),colnames(dat2))]/100)
   )
   if(!is.null(wtPar))dat<-c(dat,list('wtMu'=wtPar[1],'wtSd'=wtPar[2]))
-  fit <- sampling(mod, data = dat, iter=20000, chains=chains,thin=2,control=list(adapt_delta=.9),...)
+  fit <- sampling(mod, data = dat, iter=20000, chains=chains,thin=2,control=list(adapt_delta=.99,max_treedepth=15),...)
 }
 
 
@@ -319,26 +436,34 @@ stanCodeSites<-'
     int<lower=0> nSites;
     int<lower=0> nAllele;
     int<lower=0,upper=1> siv[nChimp];
-    int<lower=0,upper=nSites> sites[nChimp];
+    //int<lower=0,upper=nSites> sites[nChimp];
     matrix<lower=0,upper=1>[nChimp,nAllele] alleles;
   }
   parameters {
-    vector[nSites] siteIntercepts;
+    //vector[nSites] siteIntercepts;
     vector[nAllele] alleleBetas;
-    real<lower=0> shrinkage;
+    //real<lower=0> shrinkage;
+    real alpha;
+    real<lower=0> tau;
+    real<lower=0> lambda;
   }
   transformed parameters{
   }
   model {
-    siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
-    alleleBetas~double_exponential(0,shrinkage);
-    siteIntercepts~normal(0,10);
-    shrinkage~gamma(1,.1);
+    //siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
+    siv~bernoulli_logit(alpha+alleles*alleleBetas);
+    //alleleBetas~double_exponential(0,shrinkage);
+    //alleleBetas~normal(0,1);
+    alleleBetas~normal(0,lambda*tau);
+    lambda ~ cauchy(0,1);
+    tau ~ cauchy(0,1);
+    //siteIntercepts~normal(0,10);
+    //shrinkage~inv_gamma(.001,.001);
   }
 '
 modSites <- stan_model(model_code = stanCodeSites)
 
-analyzeSites<-function(siv,sites,alleles,chains=20,...){
+analyzeSites<-function(siv,sites,alleles,chains=30,...){
   if(length(siv)!=length(sites)||length(siv)!=nrow(alleles))stop('Length differences in chimps and sites')
   siteNum<-as.numeric(as.factor(sites))
   dat<-list(
@@ -349,5 +474,5 @@ analyzeSites<-function(siv,sites,alleles,chains=20,...){
     sites=siteNum,
     alleles=alleles*1
   )
-  fit <- sampling(modSites, data = dat, iter=40000, chains=chains,thin=4,control=list(adapt_delta=.9),...)
+  fit <- sampling(modSites, data = dat, iter=100000, chains=chains,thin=4,control=list(adapt_delta=.95,max_treedepth=15),...)
 }
