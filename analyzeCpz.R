@@ -42,9 +42,7 @@ if(!exists('selectFits')){
     out
   }
 
-  selectFits2<-lapply(pairs[1],function(pair)compareAlleles(mod4,pair[1],pair[2],cpz,logFunc=function(xx)xx))
-      
-      
+  selectFits2<-lapply(pairs,function(pair)compareAlleles(mod4,pair[1],pair[2],cpz))
   names(selectFits2)<-sapply(pairs,paste,collapse='-')
 }
 
@@ -52,16 +50,21 @@ xlims<-exp(range(unlist(lapply(selectFits[names(selectFits) %in% sameScale],find
 xlims2<-exp(range(unlist(lapply(selectFits[!names(selectFits) %in% sameScale],findLims))))
 dummy<-lapply(names(selectFits),function(xx){message(xx);print(selectFits[[xx]],pars=c('metaFoldChange','foldChange','repEffect'))})
 #pdf('cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=sub('-','/',xx),cols=envCols,xlims=xlims));dev.off()
-pdf('cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=sub('-','/',xx),cols=NULL,xlims=if(xx %in% sameScale)xlims else xlims2));dev.off()
-pdf('cpzRaw.pdf',width=8,height=6);par(mar=c(3,4,1,.2));lapply(pairs,function(xx)plotRaw(cpz[,grep(xx[1],colnames(cpz))],cpz[,grep(xx[2],colnames(cpz))],cols=envCols));dev.off()
+pdf('out/cpzFits.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(cpz),main=sub('-','/',xx),cols=NULL,xlims=if(xx %in% sameScale)xlims else xlims2));dev.off()
+pdf('out/cpzRaw.pdf',width=8,height=6);par(mar=c(3,4,1,.2));lapply(pairs,function(xx)plotRaw(cpz[,grep(xx[1],colnames(cpz))],cpz[,grep(xx[2],colnames(cpz))],cols=envCols));dev.off()
+xlims<-exp(range(unlist(lapply(selectFits2[names(selectFits2) %in% sameScale],findLims))))
+xlims[1]<-max(xlims[1],1e-5)
+xlims2<-exp(range(unlist(lapply(selectFits2[!names(selectFits2) %in% sameScale],findLims))))
+pdf('out/cpzFits2.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits2),function(xx)plotFit(selectFits2[[xx]],rownames(cpz),main=sub('-','/',xx),cols=NULL,xlims=if(xx %in% sameScale)xlims else xlims2));dev.off()
 
 
 apply(as.matrix(selectFits[['Human-QQNVP']])[,c('metaFoldChange','metaSd')],2,mean)
 apply(as.matrix(selectFits[['QQNVP-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
 apply(as.matrix(selectFits[['Human-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
 
-stats<-lapply(names(selectFits),function(xx){
-  out<-assignNames(pullRanges(selectFits[[xx]]),rownames(cpz))
+stats<-lapply(names(selectFits2),function(xx){
+  out<-assignNames(pullRanges(selectFits2[[xx]],convertFunc=exp),rownames(cpz))
   data.frame('comparison'=xx,'stat'=rownames(out),out)
 })
 names(stats)<-names(selectFits)
+write.csv(do.call(rbind,stats),'out/cpzStats.csv')
