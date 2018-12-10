@@ -26,6 +26,14 @@ if(!exists('selectFits')){
     else compareAlleles(mod2,pair[1],pair[2],if(in1[1])monkey1[envIn2,] else monkey2,if(in2[1])monkey1[envIn2,] else monkey2)
   })
   names(selectFits)<-sapply(pairs,paste,collapse='-')
+  selectFits2<-lapply(pairs,function(pair){
+    in1<-c(any(grepl(sprintf('%s [0-9]+',pair[1]),colnames(monkey1))),any(grepl(sprintf('%s [0-9]+',pair[1]),colnames(monkey2))))
+    in2<-c(any(grepl(sprintf('%s [0-9]+',pair[2]),colnames(monkey1))),any(grepl(sprintf('%s [0-9]+',pair[2]),colnames(monkey2))))
+    mixDat<-in1[1]!=in2[1]
+    if(!mixDat)compareAlleles(mod4,pair[1],pair[2],if(in1[1])monkey1 else monkey2)
+    else compareAlleles(mod5,pair[1],pair[2],if(in1[1])monkey1[envIn2,] else monkey2,if(in2[1])monkey1[envIn2,] else monkey2)
+  })
+  names(selectFits2)<-sapply(pairs,paste,collapse='-')
 }
 
 xlims<-exp(range(unlist(lapply(selectFits,findLims))))
@@ -49,6 +57,16 @@ lapply(names(selectFits),function(xx){
 })
 dev.off()
 
+xlims2<-exp(range(unlist(lapply(selectFits2,findLims))))
+pdf('out/monkeyFits2.pdf',width=4,height=4)
+par(mar=c(3.5,8,2,.4))
+lapply(names(selectFits2),function(xx){
+  if(sum(grepl('foldChange',colnames(as.matrix(selectFits2[[xx]]))))==9)envNames<-rownames(monkey1)
+  else envNames<-rownames(monkey2)
+  plotFit(selectFits2[[xx]],envNames,main=sub('-','/',xx),cols=NULL,xlims=xlims2)
+})
+dev.off()
+
 pdf('out/monkeyRaw.pdf',width=10,height=6)
 par(mar=c(3,4,1,.2))
 lapply(pairs,function(xx){
@@ -64,12 +82,12 @@ lapply(pairs,function(xx){
 })
 dev.off()
 
-stats<-lapply(names(selectFits),function(xx){
-  if(sum(grepl('foldChange',colnames(as.matrix(selectFits[[xx]]))))==9)envNames<-rownames(monkey1)
+stats<-parallel::mclapply(names(selectFits2),function(xx){
+  if(sum(grepl('foldChange',colnames(as.matrix(selectFits2[[xx]]))))==9)envNames<-rownames(monkey1)
   else envNames<-rownames(monkey2)
-  out<-assignNames(pullRanges(selectFits[[xx]]),envNames)
+  out<-assignNames(pullRanges(selectFits2[[xx]],convertFunc=exp),envNames)
   data.frame('comparison'=xx,'stat'=rownames(out),out)
-})
+},mc.cores=10)
 nCols<-sapply(stats,ncol)
 for(ii in unique(nCols)){
   out<-do.call(rbind,stats[nCols==ii])
