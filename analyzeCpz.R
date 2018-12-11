@@ -58,9 +58,9 @@ xlims2<-exp(range(unlist(lapply(selectFits2[!names(selectFits2) %in% sameScale],
 pdf('out/cpzFits2.pdf',width=4,height=4);par(mar=c(3.5,6,2,.4));lapply(names(selectFits2),function(xx)plotFit(selectFits2[[xx]],rownames(cpz),main=sub('-','/',xx),cols=NULL,xlims=if(xx %in% sameScale)xlims else xlims2));dev.off()
 
 
-apply(as.matrix(selectFits[['Human-QQNVP']])[,c('metaFoldChange','metaSd')],2,mean)
-apply(as.matrix(selectFits[['QQNVP-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
-apply(as.matrix(selectFits[['Human-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
+apply(as.matrix(selectFits2[['Human-QQNVP']])[,c('metaFoldChange','metaSd')],2,mean)
+apply(as.matrix(selectFits2[['QQNVP-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
+apply(as.matrix(selectFits2[['Human-QQNVT']])[,c('metaFoldChange','metaSd')],2,mean)
 
 stats<-lapply(names(selectFits2),function(xx){
   out<-assignNames(pullRanges(selectFits2[[xx]],convertFunc=exp),rownames(cpz))

@@ -7,7 +7,7 @@ rownames(mb)<-mb$env
 
 pairs<-list(c('Human','QQNVP'),c('QQNVP','QQNVT'),c('Human','QQNVT'))
 #from analyzeCpz.R
-wtPar<-list('Human-QQNVP'=c(-.624,.358),'QQNVP-QQNVT'=c(-1.02,.223),'Human-QQNVT'=c(-1.64,.543))
+wtPar<-list('Human-QQNVP'=c(-.632,.365),'QQNVP-QQNVT'=c(-1.05,.259),'Human-QQNVT'=c(-1.68,.573))
 
 if(!exists('selectFits')){
   selectFits<-lapply(pairs,function(pair){
@@ -24,7 +24,16 @@ if(!exists('selectFits')){
 
 xlims<-exp(range(unlist(lapply(selectFits,findLims))))
 dummy<-lapply(names(selectFits),function(xx){message(xx);print(selectFits[[xx]],pars=c('metaFoldChange','foldChange'))})
-pdf('mbFits.pdf',width=4,height=4);par(mar=c(3.5,11,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(mb),main=sub('-','/',xx),cols=envCols,xlims=xlims,special='WT',xlab='Fold change from WT'));dev.off()
-pdf('mbRaw.pdf',width=8,height=6);par(mar=c(3,4,1,.2));lapply(pairs,function(xx)plotRaw(mb[,grep(xx[1],colnames(mb))],mb[,grep(xx[2],colnames(mb))],cols=envCols));dev.off()
+pdf('out/mbFits.pdf',width=4,height=4);par(mar=c(3.5,11,2,.4));lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(mb),main=sub('-','/',xx),cols=envCols,xlims=xlims,special='WT',xlab='Fold change from WT'));dev.off()
+xlims<-exp(range(unlist(lapply(selectFits2,findLims))))
+pdf('out/mbFits2.pdf',width=4,height=4);par(mar=c(3.5,11,2,.4));lapply(names(selectFits2),function(xx)plotFit(selectFits2[[xx]],rownames(mb),main=sub('-','/',xx),xlims=xlims,special='WT',xlab='Fold change from WT',cols=c("WT"='#BBBBBB')));dev.off()
+pdf('out/mbRaw.pdf',width=8,height=6);par(mar=c(3,4,1,.2));lapply(pairs,function(xx)plotRaw(mb[,grep(xx[1],colnames(mb))],mb[,grep(xx[2],colnames(mb))],cols=envCols));dev.off()
+
+stats<-lapply(names(selectFits2),function(xx){
+  out<-assignNames(pullRanges(selectFits2[[xx]],convertFunc=exp),rownames(mb))
+  data.frame('comparison'=xx,'stat'=rownames(out),out)
+})
+names(stats)<-names(selectFits2)
+write.csv(do.call(rbind,stats),'out/mbStats.csv')
 
 
