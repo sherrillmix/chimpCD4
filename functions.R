@@ -332,6 +332,8 @@ stanCode7<-'
     for(ii in 2:nEnv){
       prop1[ii,]~normal(prop1Base[ii]+multBack1[ii,],sigma);
       prop2[ii,]~normal(prop1Base[ii]+foldChange[1]+foldChange[ii]+multBack2[ii,],sigma);
+    }
+    for(ii in 1:nEnv){
       back1[ii,]~normal(-6.43,.97);
       back2[ii,]~normal(-6.43,.97);
     }
@@ -345,7 +347,7 @@ mod6 <- stan_model(model_code = stanCode7)
 
 
 
-plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2)),cols=NULL){
+plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2,10)),cols=NULL){
   par(mfrow=c(2,ceiling(nrow(raw1)/2))) 
   notInCols<-rownames(raw1)[!rownames(raw1) %in% names(cols)]
   cols<-c(cols,structure(rep('black',length(notInCols)),.Names=notInCols))
@@ -414,7 +416,7 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
     for(ii in which(lows))polygon(c(10^(lowerBound),rep(10^(lowerBound+diff(par('usr')[1:2])*.04),2)),c(ii,ii+.1,ii-.1),col='black')
   }
   abline(v=1,lty=3)
-  if(!is.null(special))abline(h=max(which(colnames(selects)%in% special))-.5)
+  if(!is.null(special))abline(h=max(which(colnames(selects)%in% special))-.5,lty=2)
 }
 
 compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL,logFunc=log,chains=50,...){
