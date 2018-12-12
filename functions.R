@@ -438,25 +438,27 @@ stanCodeSites<-'
     int<lower=0> nSites;
     int<lower=0> nAllele;
     int<lower=0,upper=1> siv[nChimp];
-    //int<lower=0,upper=nSites> sites[nChimp];
+    int<lower=0,upper=nSites> sites[nChimp];
     matrix<lower=0,upper=1>[nChimp,nAllele] alleles;
   }
   parameters {
-    //vector[nSites] siteIntercepts;
-    vector[nAllele] alleleBetas;
+    vector[nSites] siteIntercepts;
+    vector[nAllele] alleleBetasRaw;
     //real<lower=0> shrinkage;
-    real alpha;
+    //real alpha;
     real<lower=0> tau;
     real<lower=0> lambda;
   }
   transformed parameters{
+    vector[nAllele] alleleBetas;
+    alleleBetas=alleleBetasRaw*lambda*tau;
   }
   model {
-    //siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
-    siv~bernoulli_logit(alpha+alleles*alleleBetas);
+    siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
+    //siv~bernoulli_logit(alpha+alleles*alleleBetas);
     //alleleBetas~double_exponential(0,shrinkage);
     //alleleBetas~normal(0,1);
-    alleleBetas~normal(0,lambda*tau);
+    alleleBetasRaw~normal(0,1);
     lambda ~ cauchy(0,1);
     tau ~ cauchy(0,1);
     //siteIntercepts~normal(0,10);
@@ -476,5 +478,5 @@ analyzeSites<-function(siv,sites,alleles,chains=30,...){
     sites=siteNum,
     alleles=alleles*1
   )
-  fit <- sampling(modSites, data = dat, iter=100000, chains=chains,thin=4,control=list(adapt_delta=.95,max_treedepth=15),...)
+  fit <- sampling(modSites, data = dat, iter=100000, chains=chains,thin=4,control=list(adapt_delta=.99,max_treedepth=20),...)
 }

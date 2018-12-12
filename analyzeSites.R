@@ -208,8 +208,13 @@ do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),funct
 do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies3[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 
 
-selector<-sites$Site.code %in% c('LB','MB')
+selector<-sites$Site.code %in% c('LB','MB','GM')
 allDummies<-cbind(dummies,dummies2,dummies3)
+tmp<-allDummies*sites[,'isLBMB']
+colnames(tmp)<-paste('LBMB',colnames(tmp))
+tmp2<-allDummies*!sites[,'isLBMB']
+colnames(tmp)<-paste('GM',colnames(tmp))
+allDummies<-cbind(tmp,tmp2,allDummies)
 #allDummies<-cbind(dummies3)
 colnames(allDummies)<-sub('25_40_|52_55_68_','',colnames(allDummies))
 colSelect<-apply(allDummies[selector,],2,sum)>0&apply(allDummies[selector,],2,sum)<sum(selector)&!colnames(allDummies) %in% ancestral
