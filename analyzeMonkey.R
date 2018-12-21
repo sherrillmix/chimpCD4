@@ -1,3 +1,4 @@
+set.seed(12346)
 source('functions.R')
 
 monkey1<-read.csv('monkeyGlycan.csv',stringsAsFactors=FALSE)
@@ -29,7 +30,7 @@ if(!exists('selectFits')){
 
 
 xlims2<-exp(range(unlist(lapply(selectFits,findLims))))
-pdf('out/monkeyFits2.pdf',width=4,height=4)
+pdf('out/monkeyFits.pdf',width=4,height=4)
 par(mar=c(3.5,8,2,.4))
 lapply(names(selectFits),function(xx){
   if(sum(grepl('foldChange',colnames(as.matrix(selectFits[[xx]]))))==9)envNames<-rownames(monkey1)

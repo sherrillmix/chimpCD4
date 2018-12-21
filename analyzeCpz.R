@@ -1,5 +1,5 @@
-source('functions.R')
 set.seed(12345)
+source('functions.R')
 
 back<-as.numeric(as.vector(read.csv('background.csv',stringsAsFactors=FALSE)[1,-1]))
 pdf('out/back.pdf');plot(1:length(back),back,xlab='Background sample',ylab='Background % infection');abline(v=seq(3,27,3)+.5);dev.off()

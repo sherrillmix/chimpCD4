@@ -1,5 +1,5 @@
+set.seed(12347)
 source('functions.R')
-set.seed(12346)
 
 mb<-read.csv('MB897.csv',stringsAsFactors=FALSE)
 colnames(mb)[1]<-'env'
@@ -19,7 +19,7 @@ if(!exists('selectFits')){
 }
 
 xlims<-exp(range(unlist(lapply(selectFits,findLims))))
-pdf('out/mbFits2.pdf',width=4,height=4)
+pdf('out/mbFits.pdf',width=4,height=4)
   par(mar=c(3.5,11,2,.4))
   lapply(names(selectFits),function(xx)plotFit(selectFits[[xx]],rownames(mb),main=sub('-','/',xx),xlims=xlims,special='WT',xlab='Fold change from WT',cols=c("WT"='#BBBBBB')))
 dev.off()
