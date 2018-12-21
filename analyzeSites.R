@@ -204,6 +204,7 @@ dev.off()
 write.csv(cbind(sites,dummies,dummies2),'sites.csv',row.names=FALSE)
 
 selector<-sites$Site.code %in% c('LB','MB','GM')
+do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies2[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 do.call(cbind,lapply(structure(c('LB','MB','GM'),.Names=c('LB','MB','GM')),function(xx)apply(cbind(dummies3[sites$Site.code==xx,],'Total'=TRUE),2,sum)))
 do.call(cbind,lapply(structure(c('TRUE','FALSE'),.Names=c('SIV+','SIV-')),function(xx)apply(cbind(dummies3[sites$Site.code %in% c('LB','MB')&sites$siv==xx,],'Total'=TRUE),2,sum)))
