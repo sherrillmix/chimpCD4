@@ -54,7 +54,7 @@ lapply(pairs,function(xx){
 })
 dev.off()
 
-stats<-mclapply(names(selectFits),function(xx){
+stats<-lapply(names(selectFits),function(xx){
   if(sum(grepl('foldChange',colnames(as.matrix(selectFits[[xx]]))))==9)envNames<-rownames(monkey1)
   else envNames<-rownames(monkey2)
   out<-assignNames(pullRanges(selectFits[[xx]],convertFunc=exp),envNames)
