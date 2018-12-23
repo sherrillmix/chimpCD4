@@ -2,7 +2,7 @@ set.seed(12345)
 source('functions.R')
 
 back<-as.numeric(as.vector(read.csv('data/background.csv',stringsAsFactors=FALSE)[1,-1]))
-print(summary(log(back))
+print(summary(log(back)))
 
 cpz<-read.csv('data/SIVcpz.csv',stringsAsFactors=FALSE)
 colnames(cpz)[1]<-'env'
