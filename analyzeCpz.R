@@ -1,10 +1,10 @@
 set.seed(12345)
 source('functions.R')
 
-back<-as.numeric(as.vector(read.csv('background.csv',stringsAsFactors=FALSE)[1,-1]))
-pdf('out/back.pdf');plot(1:length(back),back,xlab='Background sample',ylab='Background % infection');abline(v=seq(3,27,3)+.5);dev.off()
+back<-as.numeric(as.vector(read.csv('data/background.csv',stringsAsFactors=FALSE)[1,-1]))
+print(summary(log(back))
 
-cpz<-read.csv('SIVcpz.csv',stringsAsFactors=FALSE)
+cpz<-read.csv('data/SIVcpz.csv',stringsAsFactors=FALSE)
 colnames(cpz)[1]<-'env'
 colnames(cpz)[2:ncol(cpz)]<-sprintf('%s %d',rep(colnames(cpz)[seq(2,ncol(cpz),3)],each=3),1:3)
 rownames(cpz)<-cpz$env

@@ -1,8 +1,8 @@
 set.seed(12346)
 source('functions.R')
 
-monkey1<-read.csv('monkeyGlycan.csv',stringsAsFactors=FALSE)
-monkey2<-read.csv('monkeyOther.csv',stringsAsFactors=FALSE)
+monkey1<-read.csv('data/monkeyGlycan.csv',stringsAsFactors=FALSE)
+monkey2<-read.csv('data/monkeyOther.csv',stringsAsFactors=FALSE)
 
 colnames(monkey2)[1]<-colnames(monkey1)[1]<-'env'
 colnames(monkey1)[2:ncol(monkey1)]<-sprintf('%s %d',rep(colnames(monkey1)[seq(2,ncol(monkey1),3)],each=3),1:3)

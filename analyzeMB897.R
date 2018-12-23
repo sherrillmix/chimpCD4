@@ -1,7 +1,7 @@
 set.seed(12347)
 source('functions.R')
 
-mb<-read.csv('MB897.csv',stringsAsFactors=FALSE)
+mb<-read.csv('data/MB897.csv',stringsAsFactors=FALSE)
 colnames(mb)[1]<-'env'
 colnames(mb)[2:ncol(mb)]<-sprintf('%s %d',rep(colnames(mb)[seq(2,ncol(mb),3)],each=3),1:3)
 rownames(mb)<-mb$env

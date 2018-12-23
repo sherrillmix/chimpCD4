@@ -3,7 +3,7 @@ if(!dir.exists('out'))dir.create('out')
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-envColors<-read.csv('envColor.csv',stringsAsFactors=FALSE)
+envColors<-read.csv('data/envColor.csv',stringsAsFactors=FALSE)
 envColors$col<-sprintf('#%s',envColors$color)
 envCols<-structure(envColors$col,.Names=envColors$env)
 

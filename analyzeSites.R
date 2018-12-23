@@ -1,6 +1,6 @@
 source('functions.R')
 
-sites<-read.csv('siteGenotypes.csv',stringsAsFactors=FALSE)
+sites<-read.csv('data/siteGenotypes.csv',stringsAsFactors=FALSE)
 sites$siv<-ifelse(grepl('\\+',sites$SIV.infection),TRUE,ifelse(grepl('-',sites$SIV.infection),FALSE,NA))
 sites$isLBMB<-sites$Site.code %in% c('LB','MB')
 cols<-list('nt51'=colnames(sites)[grep('nt51',colnames(sites))],'25_40'=colnames(sites)[grep('25.and.40',colnames(sites))],'52_55_68'=colnames(sites)[grep('52.55.68',colnames(sites))])
