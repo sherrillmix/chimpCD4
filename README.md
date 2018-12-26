@@ -15,20 +15,20 @@ This code should generate analysis result files in the `out` directory. Example 
 ### Raw data
 ![SICcpz envs raw infectivity](exampleOut/cpzRaw.png)
 ### Bayesian estimates
-![SICcpz envs Bayesian estimates](exampleOut/cpzFits.png)
+![SICcpz envs Bayesian estimates](exampleOut/cpzFits.png =250x)
 
 ## SIV envs
 ### Raw data
 ![SIV env raw infectivity](exampleOut/monkeyRaw.png)
 ### Bayesian estimates
-![SIV env Bayesian estimates](exampleOut/monkeyFits.png)
+![SIV env Bayesian estimates](exampleOut/monkeyFits.png =250x)
 
 
 ## MB897 mutants
 ### Raw data
 ![MB897 mutants raw infectivity](exampleOut/mbRaw.png)
 ### Bayesian estimates
-![MB897 mutants Bayesian estimates](exampleOut/mbFits.png)
+![MB897 mutants Bayesian estimates](exampleOut/mbFits.png =250x)
 
 ## SIV infection in wild chimps
 ![Logistic regression of SIV infection on polymorphisms](exampleOut/glm.png)
