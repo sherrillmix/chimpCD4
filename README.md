@@ -30,6 +30,8 @@ This code should generate analysis result files in the `out` directory. Example 
 ### Bayesian estimates
 ![MB897 mutants Bayesian estimates](exampleOut/mbFits.png)
 
+## SIV infection in wild chimps
+![Logistic regression of SIV infection on polymorphisms](exampleOut/glm.png)
 
 
 
