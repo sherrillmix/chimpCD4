@@ -13,9 +13,9 @@ This code should generate analysis result files in the `out` directory. Example 
 
 ## SIVcpz envs
 ### Raw data
-![SICcpz envs raw infectivity](exampleOut/cpzRaw.png){width="200px"}
+![SICcpz envs raw infectivity](exampleOut/cpzRaw.png)
 ### Bayesian estimates
-![SICcpz envs Bayesian estimates](exampleOut/cpzFits.png){width="200px"}
+![SICcpz envs Bayesian estimates](exampleOut/cpzFits.png)
 
 ## SIV envs
 ### Raw data
