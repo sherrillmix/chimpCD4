@@ -3,191 +3,15 @@ if(!dir.exists('out'))dir.create('out')
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
-envColors<-read.csv('envColor.csv',stringsAsFactors=FALSE)
+envColors<-read.csv('data/envColor.csv',stringsAsFactors=FALSE)
 envColors$col<-sprintf('#%s',envColors$color)
 envCols<-structure(envColors$col,.Names=envColors$env)
 
-stanCode<-'
-  data {
-    int<lower=0> nEnv;
-    int<lower=0> nRep;
-    //matrix<lower=0,upper=1>[nEnv,nRep] prop1;
-    //matrix<lower=0,upper=1>[nEnv,nRep] prop2;
-    matrix[nEnv,nRep] prop1;
-    matrix[nEnv,nRep] prop2;
-  }
-  parameters {
-    real metaFoldChange;
-    real<lower=0> metaSd;
-    vector[nRep] prop1BaseRaw[nEnv];
-    vector[nEnv] metaRaw;
-    real<lower=0> sigma;
-    vector[nRep-1] repEffect;
-    real<lower=0> baseSigma;
-    real baseMu[nEnv];
-  }
-  transformed parameters{
-    vector[nEnv] foldChange;
-    vector[nRep] repEffectPlusZero;
-    vector[nRep] prop1Base[nEnv];
-    foldChange=metaFoldChange+metaRaw*metaSd;
-    repEffectPlusZero[1]=0;
-    repEffectPlusZero[2:nRep]=repEffect[1:(nRep-1)];
-    for(ii in 1:nEnv){
-      prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
-    }
-  }
-  model {
-    for(ii in 1:nEnv){
-      prop1BaseRaw[ii]~normal(0,1);
-      prop1[ii,]~normal(prop1Base[ii],sigma);
-      prop2[ii,]~normal(prop1Base[ii]+foldChange[ii],sigma);
-    }
-    //back~normal(-1.8,1);
-    metaRaw~normal(0,1);
-  }
-'
-mod <- stan_model(model_code = stanCode)
 
-stanCode2<-'
+stanCodeCpz<-'
   data {
     int<lower=0> nEnv;
     int<lower=0> nRep;
-    matrix[nEnv,nRep] prop1;
-    matrix[nEnv,nRep] prop2;
-  }
-  parameters {
-    real metaFoldChange;
-    real<lower=0> metaSd;
-    real prop1Base[nEnv];
-    vector[nEnv] metaRaw;
-    real<lower=0> sigma;
-    vector[nRep-1] repEffect1;
-    vector[nRep-1] repEffect2;
-  }
-  transformed parameters{
-    vector[nEnv] foldChange;
-    vector[nRep] repEffectPlusZero1;
-    vector[nRep] repEffectPlusZero2;
-    foldChange=metaFoldChange+metaRaw*metaSd;
-    repEffectPlusZero1[1]=0;
-    repEffectPlusZero1[2:nRep]=repEffect1;
-    repEffectPlusZero2[1]=0;
-    repEffectPlusZero2[2:nRep]=repEffect2;
-  }
-  model {
-    for(ii in 1:nEnv){
-      prop1[ii,]~normal(prop1Base[ii]+repEffectPlusZero1,sigma);
-      prop2[ii,]~normal(prop1Base[ii]+repEffectPlusZero2+foldChange[ii],sigma);
-    }
-    //back~normal(-1.8,1);
-    metaRaw~normal(0,1);
-  }
-'
-mod2 <- stan_model(model_code = stanCode2)
-
-stanCode3<-'
-  data {
-    int<lower=0> nEnv;
-    int<lower=0> nRep;
-    matrix[nEnv,nRep] prop1;
-    matrix[nEnv,nRep] prop2;
-    real wtSd;
-    real wtMu;
-  }
-  parameters {
-    real metaFoldChange;
-    real<lower=0> metaSd;
-    real prop1Base[nEnv];
-    vector[nEnv-1] metaRaw;
-    real<lower=0> sigma;
-    real wtFoldChange;
-  }
-  transformed parameters{
-    vector[nEnv] foldChange;
-    foldChange[1]=wtFoldChange;
-    foldChange[2:nEnv]=metaFoldChange+metaRaw*metaSd;
-  }
-  model {
-    prop1[1,]~normal(prop1Base[1],sigma);
-    prop2[1,]~normal(prop1Base[1]+foldChange[1],sigma);
-    for(ii in 2:nEnv){
-      prop1[ii,]~normal(prop1Base[ii],sigma);
-      prop2[ii,]~normal(prop1Base[ii]+foldChange[1]+foldChange[ii],sigma);
-    }
-    metaRaw~normal(0,1);
-    wtFoldChange~normal(wtMu,wtSd);
-  }
-'
-mod3 <- stan_model(model_code = stanCode3)
-
-stanCode4<-'
-  data {
-    int<lower=0> nEnv;
-    int<lower=0> nRep;
-    matrix<lower=0,upper=1>[nEnv,nRep] prop1;
-    matrix<lower=0,upper=1>[nEnv,nRep] prop2;
-  }
-  parameters {
-    real metaFoldChange;
-    real<lower=0> metaSd;
-    vector[nRep] prop1BaseRaw[nEnv];
-    vector[nEnv] metaRaw;
-    real<lower=0> sigma;
-    vector[nRep-1] repEffect;
-    real<lower=0> baseSigma;
-    real baseMu[nEnv];
-    matrix<upper=0>[nEnv,nRep] back1;
-    matrix<upper=0>[nEnv,nRep] back2;
-    matrix[nEnv,nRep] trueProp1Raw;
-    matrix[nEnv,nRep] trueProp2Raw;
-    matrix<lower=2000>[nEnv,nRep] nCells1;
-    matrix<lower=2000>[nEnv,nRep] nCells2;
-  }
-  transformed parameters{
-    vector[nEnv] foldChange;
-    vector[nRep] repEffectPlusZero;
-    vector[nRep] prop1Base[nEnv];
-    matrix<lower=0,upper=1>[nEnv,nRep] propPlusBack1;
-    matrix<lower=0,upper=1>[nEnv,nRep] propPlusBack2;
-    foldChange=metaFoldChange+metaRaw*metaSd;
-    repEffectPlusZero[1]=0;
-    repEffectPlusZero[2:nRep]=repEffect[1:(nRep-1)];
-    for(ii in 1:nEnv){
-      prop1Base[ii]=baseMu[ii]+repEffectPlusZero+prop1BaseRaw[ii]*baseSigma;
-      propPlusBack1[ii,]=inv_logit(trueProp1Raw[ii,]*sigma+to_row_vector(prop1Base[ii]))+inv_logit(back1[ii,]);
-      propPlusBack2[ii,]=inv_logit(trueProp2Raw[ii,]*sigma+to_row_vector(prop1Base[ii])+foldChange[ii])+inv_logit(back2[ii,]);
-      for(jj in 1:nRep){
-        propPlusBack1[ii,jj]=fmin(propPlusBack1[ii,jj],.9999);
-        propPlusBack2[ii,jj]=fmin(propPlusBack2[ii,jj],.9999);
-      }
-    }
-  }
-  model {
-    baseSigma~gamma(1,.1);
-    sigma~gamma(1,.1);
-    metaRaw~normal(0,1);
-    for(ii in 1:nEnv){
-      prop1BaseRaw[ii]~normal(0,1);
-      //trueProp1[ii,]~normal(prop1Base[ii],sigma);
-      //trueProp2[ii,]~normal(prop1Base[ii]+foldChange[ii],sigma);
-      trueProp1Raw[ii,]~normal(0,1);
-      trueProp2Raw[ii,]~normal(0,1);
-      back1[ii,]~normal(-6.43,.97);
-      back2[ii,]~normal(-6.43,.97);
-      nCells1[ii,]~normal(5000,750);
-      nCells2[ii,]~normal(5000,750);
-      prop1[ii,]~normal(propPlusBack1[ii,],sqrt(propPlusBack1[ii,].*(1-propPlusBack1[ii,])./nCells1[ii,]));
-      prop2[ii,]~normal(propPlusBack2[ii,],sqrt(propPlusBack2[ii,].*(1-propPlusBack2[ii,])./nCells2[ii,]));
-    }
-  }
-'
-stanCode5<-'
-  data {
-    int<lower=0> nEnv;
-    int<lower=0> nRep;
-    //matrix<lower=0,upper=1>[nEnv,nRep] prop1;
-    //matrix<lower=0,upper=1>[nEnv,nRep] prop2;
     matrix[nEnv,nRep] prop1;
     matrix[nEnv,nRep] prop2;
   }
@@ -235,9 +59,9 @@ stanCode5<-'
     metaSd~gamma(1,.1);
   }
 '
-mod4 <- stan_model(model_code = stanCode5)
+modCpz <- stan_model(model_code = stanCodeCpz)
 
-stanCode6<-'
+stanCodeMonkey<-'
   data {
     int<lower=0> nEnv;
     int<lower=0> nRep;
@@ -294,9 +118,9 @@ stanCode6<-'
     metaSd~gamma(1,.1);
   }
 '
-mod5 <- stan_model(model_code = stanCode6)
+modMonkey <- stan_model(model_code = stanCodeMonkey)
 
-stanCode7<-'
+stanCodeMB<-'
   data {
     int<lower=0> nEnv;
     int<lower=0> nRep;
@@ -341,11 +165,37 @@ stanCode7<-'
     wtFoldChange~normal(wtMu,wtSd);
   }
 '
-mod6 <- stan_model(model_code = stanCode7)
+modMB <- stan_model(model_code = stanCodeMB)
 
-
-
-
+logAxis<-function(side=2,exponent=TRUE,addExtra=!exponent,minorTcl=-.2,axisMin=-Inf,axisMax=Inf,offset=0,col.ticks='black',...){
+  if(side %in% c(2,4)) parX<-sort(graphics::par('usr')[3:4])
+  else parX<-sort(graphics::par('usr')[1:2])
+  minX<-max(10^parX[1],axisMin)
+  maxX<-min(10^parX[2],axisMax)
+  if(log10(maxX)-log10(minX)>400)stop(simpleError('Huge range in logged axis'))
+  allTicks<-unlist(lapply(floor(log10(minX)):ceiling(log10(maxX)),function(x)1:9*10^x))
+  allTicks<-allTicks[allTicks<=maxX & allTicks>=minX]
+  graphics::axis(side,allTicks+offset,rep('',length(allTicks)),tcl=minorTcl,col.ticks=col.ticks)
+  if(ceiling(log10(minX))<=floor(log10(maxX)))prettyY<-seq(ceiling(log10(minX)),floor(log10(maxX)),1)
+  else prettyY<-c()
+  graphics::axis(side,10^prettyY+offset,rep('',length(prettyY)),tcl=minorTcl*2,col.ticks=col.ticks)
+  if(length(prettyY)>7)prettyY<-pretty(prettyY)
+  if(length(prettyY)==0)prettyY<-c(ceiling(log10(minX)),floor(log10(maxX)))
+  if(addExtra){
+    origPretty<-prettyY
+    if(sum(prettyY>=log10(minX)&prettyY<=log10(maxX))<4)prettyY<-unique(c(prettyY,origPretty+log10(5),origPretty-log10(10/5)))
+    if(sum(prettyY>=log10(minX)&prettyY<=log10(maxX))<4)prettyY<-unique(c(prettyY,origPretty+log10(2),origPretty-log10(10/2)))
+    if(sum(prettyY>=log10(minX)&prettyY<=log10(maxX))<4)prettyY<-unique(c(prettyY,origPretty+log10(3),origPretty-log10(10/3)))
+    if(sum(prettyY>=log10(minX)&prettyY<=log10(maxX))<4)prettyY<-unique(c(prettyY,origPretty+log10(7),origPretty-log10(10/7)))
+  }
+  if(exponent){
+    if(any(prettyY%%1!=0))labs<-sapply(prettyY,function(x)as.expression(bquote(.(10^(x%%1))%*%10^.(floor(x)))))
+    else labs<-ifelse(prettyY==0,1,sapply(prettyY,function(x)as.expression(bquote(10^.(floor(x))))))
+  }
+  else labs<-10^prettyY
+  graphics::axis(side,10^prettyY+offset,labs,col.ticks=col.ticks,...)
+  return(invisible(list('minor'=allTicks,'major'=10^prettyY)))
+}
 
 plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$','',colnames(raw2)[1]),ylim=range(cbind(raw1,raw2,10)),cols=NULL){
   par(mfrow=c(2,ceiling(nrow(raw1)/2))) 
@@ -358,7 +208,7 @@ plotRaw<-function(raw1,raw2,lab1=sub(' .*$','',colnames(raw1)[1]),lab2=sub(' .*$
     points(rep(1,ncol(raw1)),raw1[ii,],pch=21,bg=cols[rownames(raw1)[ii]])
     points(rep(2,ncol(raw2)),raw2[ii,],pch=21,bg=cols[rownames(raw1)[ii]])
     text(rep(1.5,ncol(raw1)),exp((log(raw1[ii,])+log(raw2[ii,]))/2),1:ncol(raw1))
-    dnar::logAxis(las=1)
+    logAxis(las=1)
   }
 }
 
@@ -407,7 +257,7 @@ plotFit<-function(fit,virus,main='',cols=NULL,xlims=c(min(c(1,selects)),max(c(1,
   axis(2,1:ncol(selects),colnames(selects),las=1)
   segments(selects['lower',],1:ncol(selects),selects['upper',],1:ncol(selects))
   points(selects['mean',],1:ncol(selects),pch=21,bg=cols[colnames(selects)])
-  dnar::logAxis(1)
+  logAxis(1)
   if(xlims[2]<3&xlims[1]>.1)axis(1,.5)
   if(xlims[2]<10&xlims[1]>.5)axis(1,.7)
   lowerBound<-par('usr')[1]
@@ -431,52 +281,17 @@ compareAlleles<-function(mod,allele1,allele2,dat1,dat2=dat1,wtPar=NULL,logFunc=l
   fit <- sampling(mod, data = dat, iter=20000, chains=chains,thin=2,control=list(adapt_delta=.99,max_treedepth=15),...)
 }
 
-
-stanCodeSites<-'
-  data {
-    int<lower=0> nChimp;
-    int<lower=0> nSites;
-    int<lower=0> nAllele;
-    int<lower=0,upper=1> siv[nChimp];
-    int<lower=0,upper=nSites> sites[nChimp];
-    matrix<lower=0,upper=1>[nChimp,nAllele] alleles;
-  }
-  parameters {
-    vector[nSites] siteIntercepts;
-    vector[nAllele] alleleBetasRaw;
-    //real<lower=0> shrinkage;
-    //real alpha;
-    real<lower=0> tau;
-    real<lower=0> lambda;
-  }
-  transformed parameters{
-    vector[nAllele] alleleBetas;
-    alleleBetas=alleleBetasRaw*lambda*tau;
-  }
-  model {
-    siv~bernoulli_logit(alleles*alleleBetas+siteIntercepts[sites]);
-    //siv~bernoulli_logit(alpha+alleles*alleleBetas);
-    //alleleBetas~double_exponential(0,shrinkage);
-    //alleleBetas~normal(0,1);
-    alleleBetasRaw~normal(0,1);
-    lambda ~ cauchy(0,1);
-    tau ~ cauchy(0,1);
-    //siteIntercepts~normal(0,10);
-    //shrinkage~inv_gamma(.001,.001);
-  }
-'
-modSites <- stan_model(model_code = stanCodeSites)
-
-analyzeSites<-function(siv,sites,alleles,chains=30,...){
-  if(length(siv)!=length(sites)||length(siv)!=nrow(alleles))stop('Length differences in chimps and sites')
-  siteNum<-as.numeric(as.factor(sites))
-  dat<-list(
-    nChimp=length(siv),
-    nSites=max(siteNum),
-    nAllele=ncol(alleles),
-    siv=siv*1,
-    sites=siteNum,
-    alleles=alleles*1
-  )
-  fit <- sampling(modSites, data = dat, iter=100000, chains=chains,thin=4,control=list(adapt_delta=.99,max_treedepth=20),...)
+plotGlm<-function(mod,xlim=range(c(mod$upper,mod$lower)),main='',xlab='Fold change in odds of SIVcpz infection',cex.axis=.9,...){
+  mod$upper<-mod$Estimate+mod[,'Std. Error']*2
+  mod$lower<-mod$Estimate-mod[,'Std. Error']*2
+  ylims<-c(.5,nrow(mod))
+  plot(1,1,type='n',xlim=exp(xlim),ylim=ylims,ylab='',xlab=xlab,yaxt='n',log='x',xaxt='n',mgp=c(2.25,1,0),bty='l',...)
+  par(lheight=.7)
+  mtext(sub(' ','\n',main),3,xpd=NA,at=ifelse(nchar(main)>20,1,1),line=ifelse(grepl(' ',main),0,.7),cex=cex.axis/1.2)
+  points(exp(mod$Estimate),nrow(mod):1,pch=21,bg='black',cex=.8)
+  segments(exp(mod$lower),nrow(mod):1,exp(mod$upper),nrow(mod):1)
+  axis(2,nrow(mod):1,rownames(mod),las=1,xpd=NA,tcl=-.2,mgp=c(3,.5,0),cex.axis=cex.axis)
+  logAxis(1,mgp=c(3,.4,0),cex.axis=cex.axis)
+  abline(v=1,lty=2)
 }
+
