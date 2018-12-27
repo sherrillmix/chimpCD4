@@ -7,7 +7,7 @@ The code depends on the R package `rstan` available from CRAN (`install.packages
 This code should generate analysis result files in the `out` directory. Example output is available in the `exampleOut` directory where:
 * file ending in `Raw.pdf`: show the raw infectivity data for three replicate experiments
 * file ending in `Fits.pdf`: give graphical summaries of the posterior probabilities for the change in infectivity between two alleles from the Bayesian analysis
-* file ending in `Stats.pdf`: record summaries of the posterior probabilities for the change in infectivity between two alleles from the Bayesian analysis
+* file ending in `Stats.csv`: record summaries of the posterior probabilities for the change in infectivity between two alleles from the Bayesian analysis
 * `glm.pdf`: shows the results of a logistic regression of SIV infection on the presence of polymorphisms in wild chimps
 
 
