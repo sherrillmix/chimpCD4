@@ -1,4 +1,6 @@
 set.seed(12345)
+source('functions.R')
+
 alleles<-dnar::fillDown(unlist(read.csv('dat/Mus CD4 data for Scott.csv',nrows=1,header=FALSE,stringsAsFactors=FALSE,check.names=FALSE))[-1])
 dates<-unlist(read.csv('dat/Mus CD4 data for Scott.csv',nrows=2,header=FALSE,stringsAsFactors=FALSE)[2,])[-1]
 dat<-read.csv('dat/Mus CD4 data for Scott.csv',stringsAsFactors=FALSE,row.names=1,skip=2,header=FALSE)
@@ -6,6 +8,8 @@ monk<-data.frame('rep'=unlist(dat),'virus'=rep(rownames(dat),ncol(dat)),'date'=r
 monk<-monk[monk$virus!='SIVden CD1',]
 monk$siv<-ifelse(!grepl('SIV',monk$virus),'SIVcpz',ifelse(grepl('SIVgor',monk$virus),'SIVgor','Monkey SIV'))
 monk$siv[grepl('Mock',monk$virus)]<-'Mock'
+monk$species<-ifelse(monk$siv=='SIVcpz','cpz',ifelse(monk$siv=='SIVgor','gor',sub('SIV(...).*','\\1',monk$virus)))
+monk$repNo0<-ifelse(monk$rep==0&!is.na(monk$rep),min(monk$rep[monk$rep>0],na.rm=TRUE),monk$rep)
 
 bono<-read.csv('dat/bonobo CD4 data for Scott.csv')
 alleles<-dnar::fillDown(unlist(read.csv('dat/gorilla CD4 data for Scott 10162020.csv',nrows=1,header=FALSE,stringsAsFactors=FALSE)))[-1]
@@ -14,13 +18,13 @@ dat<-read.csv('dat/gorilla CD4 data for Scott 10162020.csv',row.names=1,skip=2,h
 gor<-data.frame('rep'=unlist(dat),'virus'=rep(rownames(dat),ncol(dat)),'date'=rep(dates,each=nrow(dat)),'allele'=rep(alleles,each=nrow(dat)),stringsAsFactors=FALSE)
 gor$siv<-ifelse(!grepl('SIV',gor$virus),'SIVcpz',ifelse(grepl('SIVgor',gor$virus),'SIVgor','Monkey SIV'))
 gor$siv[grepl('Mock',gor$virus)]<-'Mock'
+gor$species<-ifelse(gor$siv=='SIVcpz','cpz',ifelse(gor$siv=='SIVgor','gor',sub('SIV(...).*','\\1',gor$virus)))
 hum<-gor[gor$allele=='Human',]
 rownames(hum)<-paste(hum$virus,hum$date)
 gor$hum<-hum[paste(gor$virus,gor$date),'rep']
 gor$norm<-gor$rep/gor$hum
+
 means<-tapply(gor$norm,gor[colnames(gor)!='Human',c('virus','allele')],mean,na.rm=TRUE)
-
-
 apply(means[,!grepl('Bonobo|Human',colnames(means))],2,function(xx){(wilcox.test(xx[unique(gor[gor$siv=='SIVcpz','virus'])],xx[unique(gor[gor$siv=='SIVgor','virus'])]))$p.value})
 apply(means[,!grepl('Bonobo|Human',colnames(means))],2,function(xx){(t.test(xx[unique(gor[gor$siv=='Monkey SIV','virus'])],xx[unique(gor[gor$siv=='SIVgor','virus'])]))$p.value})
 apply(means[,!grepl('Bonobo|Human|N15T',colnames(means))],2,function(xx){(wilcox.test(xx[unique(gor[gor$siv=='Monkey SIV','virus'])],xx[unique(gor[gor$siv=='SIVcpz','virus'])]))$p.value})
@@ -205,6 +209,7 @@ virLookup<-list(
   'Other'=c('SIVmus1-54'='SIVmus1-54','SIVmusGAB11'='SIVmusGAB11','SIVlst7'='SIVlstUS7','SIVagmTAN1'='SIVagmTAN1','SIVwrcGM05'='SIVwrcGM05','SIVasc'='SIVascRT11','SIVsmmFTq'='SIVsmmFTq','SIVsmmSL92b'='SIVsmmSL92b')
 )
 alleleLookup=c('Human','AHSM','ARSM','ANSR','PRSM','AHPM')
+
 pdf('heat.pdf')
 tmp<-means[!grepl('Mock',rownames(means)),!grepl('Human',colnames(means))]
 method<-'euclidean'
@@ -225,6 +230,7 @@ plotFunc<-function(tmp){
   abline(h=2:nrow(means)-.5,v=2:nrow(means)-.5,col='#FFFFFF33',lwd=2)
   box()
 }
+
 par(mar=c(5,7,.1,.3))
 plotFunc(tmp)
 virOrder<-rev(unlist(lapply(virLookup,names)))
@@ -250,8 +256,9 @@ virLookup<-list(
   'SIVcpz'=c('MT145'='SIVcpzMT145','MB897'='SIVcpzMB897','BF1167'='SIVcpzBF1167','TAN2'='SIVcpzTAN2'),
   'SIVgor'=c('SIVgorCP2135'='SIVgorCP2135','SIVgorBPID1'='SIVgorBPID1','SIVgorBQID2'='SIVgorBQID2')
 )
-alleleLookup=unique(monk$allele)
+alleleLookup<-unique(monk$allele)
 means<-tapply(monk$rep,monk[,c('virus','allele')],mean,na.rm=TRUE)
+
 pdf('Fig._3_heat.pdf')
 tmp<-means[!grepl('Mock',rownames(means)),]
 method<-'euclidean'
@@ -348,9 +355,6 @@ wilcox.test(
 paired=TRUE)
 
 
-library('rstan')
-rstan_options(auto_write = TRUE)
-options(mc.cores = parallel::detectCores())
 stanCode<-'
   data {
     int<lower=0> nVirus;
@@ -365,6 +369,8 @@ stanCode<-'
     int<lower=0> experiment[nRep];
     real backMean;
     real<lower=0> backSd;
+    //int<lower=0> nMock;
+    //real<lower=0> mock[nMock];
   }
   parameters {
     matrix[nAllele,nVirus] alleleVirus;
@@ -373,11 +379,13 @@ stanCode<-'
     real<lower=0> sdGroup[nGroup];
     real<lower=0> repSd;
     vector<lower=0>[nRep] background;
-    real humMean;
-    real<lower=0> humSd;
+    //real<lower=0> humMean;
+    //real<lower=0> humSd;
     real<lower=0> alleleSd;
-    vector[nAllele-1] alleleMeans;
-    real<lower=0> nu[nGroup];
+    vector[nAllele] alleleMeans;
+    //real<lower=0> nu;
+    //real<lower=0> backMean;
+    //real<lower=0> backSd;
   }
   transformed parameters{
     vector[nRep] beta;
@@ -387,57 +395,32 @@ stanCode<-'
       if(allele[ii]!=1)beta[ii]=beta[ii]+alleleVirus[allele[ii],virus[ii]];
       //beta[ii]=log_sum_exp(beta[ii],log(background)[ii]);
     }
-    beta=log(exp(beta)+background);
+    //beta=log(exp(beta)+background);
   }
   model {
-    rep~normal(beta,repSd);
-    for(ii in 1:nVirus)alleleVirus[2:nAllele,ii]~student_t(nu[virusGroup[ii]],alleleGroup[,virusGroup[ii]],sdGroup[virusGroup[ii]]);
+    rep~normal(log(exp(beta)+background),repSd);
+    for(ii in 1:nVirus)alleleVirus[2:nAllele,ii]~normal(alleleGroup[,virusGroup[ii]],sdGroup[virusGroup[ii]]);
+    //for(ii in 1:nVirus)alleleVirus[2:nAllele,ii]~student_t(10,alleleGroup[,virusGroup[ii]],sdGroup[virusGroup[ii]]);
     for(ii in 1:nGroup)alleleGroup[,ii]~normal(alleleMeans,alleleSd);
     for(ii in 2:nExperiment)virusExperiment[,ii-1]~normal(0,10);
-    sigma_raw ~ cauchy(0., 5);
     repSd~gamma(1,.1);
     sdGroup~gamma(1,.1);
     background~normal(backMean,backSd);
-    alleleVirus[1,]~normal(humMean,humSd);
-    humSd~gamma(1,.1);
+    alleleVirus[1,]~normal(-2,10);
     alleleMeans~normal(0,10);
     alleleSd~gamma(1,.1);
-    nu ~ gamma(2, 0.1);
+    //nu~gamma(2,.1);
   }
 '
 modAllele <- stan_model(model_code = stanCode)
-fitModel<-function(virus,allele,group,rep,experiment,mock,mod,chains=50,baseAllele='Human',...){
-  virusId<-structure(1:length(unique(virus)),.Names=sort(unique(virus)))
-  alleleId<-structure(1:length(unique(allele)),.Names=c(baseAllele,sort(unique(allele[allele!=baseAllele]))))
-  groupId<-structure(1:length(unique(group)),.Names=sort(unique(group)))
-  experimentId<-structure(1:length(unique(experiment)),.Names=sort(unique(experiment)))
-  groupLookup<-unique(cbind(virus,group))
-  if(any(table(groupLookup[,'virus'])>1))stop('Problem assigning group')
-  rownames(groupLookup)<-groupLookup[,'virus']
-  virusGroup<-groupId[groupLookup[names(virusId),'group']]
-  names(virusGroup)<-names(virusId)
-  rep[rep==0]<-min(rep[rep>0])/2
-  dat<-list(
-    nVirus=max(virusId),
-    nAllele=max(alleleId),
-    nRep=length(rep),
-    nGroup=max(groupId),
-    nExperiment=max(experimentId),
-    rep=log(rep/100),
-    allele=alleleId[allele],
-    virus=virusId[virus],
-    virusGroup=virusGroup,
-    experiment=experimentId[experiment],
-    backMean=mean((mock/100)),
-    backSd=sd((mock/100))
-  )
-  fit <- sampling(mod, data = dat, iter=10000, chains=chains,thin=2,control=list(adapt_delta=.99,max_treedepth=15),...)
-  return(list('fit'=fit,'dat'=dat,'virusId'=virusId,'groupId'=groupId,'virusGroup'=virusGroup,'alleleId'=alleleId,mod=modAllele))
-}
-fit<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,monk[monk$virus=='Mock'&!is.na(monk$rep),'rep'],modAllele,chains=50))
+
+#mocks<-c(monk[monk$virus=='Mock'&!is.na(monk$rep),'rep'])
+mocks<-c(gor[grepl('Mock',gor$virus)&!is.na(gor$rep),'rep'],monk[monk$virus=='Mock'&!is.na(monk$rep),'rep'])
+fit<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,mocks,modAllele,chains=50))
 
 save(fit,file='tmp.Rdat')
-print(fit)
+print(fit$fit,'alleleMeans')
+print(fit$fit,c('beta','background'),include=FALSE)
 
 mat<-as.matrix(fit$fit)
 pdf('test.pdf');plot(monk[monk$virus!='Mock'&!is.na(monk$rep),'rep'],exp(apply(mat[,grep('beta',colnames(mat))],2,mean)),log='xy');dev.off()
@@ -449,7 +432,6 @@ dev.off()
 diffs<-do.call(rbind,lapply(fit$virusId,function(vir){
   do.call(rbind,lapply(fit$alleleId,function(xx){
     out<-data.frame(do.call(rbind,lapply(fit$alleleId,function(yy){
-      crIMean<-function(xx,crI=c(.025,.975))c(quantile(xx,crI),mean(xx<0))
       if(xx==yy)return(c(0,0,.5))
       if(xx==1)return(crIMean(-mat[,sprintf('alleleVirus[%d,%d]',yy,vir)]))
       if(yy==1)return(crIMean(mat[,sprintf('alleleVirus[%d,%d]',xx,vir)]))
@@ -488,3 +470,200 @@ colnames(out)<-c('Virus','Allele1','Allele2','p(fold change<1)','Lower95CrI','Up
 out$Lower95CrI<-exp(out$Lower95CrI)
 out$Upper95CrI<-exp(out$Upper95CrI)
 write.csv(out,'monkeyDiffs.csv')
+
+stanCode2<-'
+  data {
+    int<lower=0> nVirus;
+    int<lower=0> nAllele;
+    int<lower=0> nRep;
+    int<lower=0> nGroup;
+    int<lower=0> nExperiment;
+    vector[nRep] rep;
+    int<lower=0> allele[nRep];
+    int<lower=0> virus[nRep];
+    int<lower=0> virusGroup[nVirus];
+    int<lower=0> experiment[nRep];
+    real backMean;
+    real<lower=0> backSd;
+    real<lower=0> tNu;
+  }
+  parameters {
+    matrix[nVirus,nAllele] alleleVirus;
+    matrix[nVirus,nExperiment-1] virusExperiment;
+    matrix[nAllele,nGroup] alleleGroup;
+    real<lower=0> sdGroup[nGroup];
+    real<lower=0> repSd;
+    vector<lower=0>[nRep] background;
+    real<lower=0> alleleSd;
+    vector[nAllele] alleleMeans;
+  }
+  transformed parameters{
+    vector[nRep] beta;
+    for(ii in 1:nRep){
+      beta[ii]=alleleVirus[virus[ii],allele[ii]];
+      if(experiment[ii]!=1)beta[ii]=beta[ii]+virusExperiment[virus[ii],experiment[ii]-1];
+    }
+  }
+  model {
+    rep~normal(log(exp(beta)+background),repSd);
+    for(ii in 1:nVirus)alleleVirus[ii,]~student_t(tNu,alleleGroup[,virusGroup[ii]],sdGroup[virusGroup[ii]]);
+    for(ii in 1:nGroup)alleleGroup[,ii]~student_t(tNu,alleleMeans,alleleSd);
+    for(ii in 2:nExperiment)virusExperiment[,ii-1]~normal(0,5);
+    repSd~gamma(1,.1);
+    sdGroup~gamma(1,.1);
+    background~normal(backMean,backSd);
+    alleleMeans~normal(-2,3);
+    //virusMeans~normal(0,10);
+    alleleSd~gamma(1,.1);
+  }
+'
+modAllele2 <- stan_model(model_code = stanCode2)
+
+fit<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,mocks,modAllele2,chains=50,nIter=10000))
+mat<-as.matrix(fit$fit)
+pdf('monkDiff3.pdf',height=10,width=8)
+plotFit(fit)
+dev.off()
+
+out<-diffs[,c('vir','all1','all2','V3','X2.5.','X97.5.')]
+colnames(out)<-c('Virus','Allele1','Allele2','p(fold change<1)','Lower95CrI','Upper95CrI')
+out$Lower95CrI<-exp(out$Lower95CrI)
+out$Upper95CrI<-exp(out$Upper95CrI)
+write.csv(out,'monkeyDiffs2.csv')
+
+fit2<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,mocks,modAllele2,chains=50,nIter=10000))
+save(fit2,file='tmp2.Rdat')
+fit3<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$species,xx$rep,xx$date,mocks,modAllele2,chains=50,nIter=10000,tNu=10))
+fitGor<-dnar::withAs(xx=gor[!grepl('Mock',gor$virus)&!is.na(gor$rep)&!grepl('Bonobo|N15T',gor$allele),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,mocks,modAllele2,chains=20,nIter=10000))
+fitCpz<-dnar::withAs(xx=gor[!grepl('Mock',gor$virus)&!is.na(gor$rep)&grepl('Bonobo|Human',gor$allele),],fitModel(xx$virus,xx$allele,xx$siv,xx$rep,xx$date,mocks,modAllele2,chains=20,nIter=10000))
+
+print(fitGor$fit,c('beta','background'),include=FALSE)
+print(fitCpz$fit,c('beta','background'),include=FALSE)
+
+pdf('alleleGroup.pdf',width=14,height=5)
+  par(mar=c(0,0,0,0))
+  nAllele<-max(fit$alleleId)
+  nGroup<-max(fit$groupId)
+  layout(cbind(0,rbind(matrix(1:(nAllele*nGroup),nrow=nGroup),0)),height=c(rep(1,nGroup),.5),width=c(.5,rep(1,nAllele)))
+  allGroup<-mat[,grepl('alleleGroup',colnames(mat))]
+  allSd<-mat[,grepl('sdGroup',colnames(mat))]
+  plusSd<-lapply(structure(colnames(allGroup),.Names=colnames(allGroup)),function(xx)density(LaplacesDemon::rst(nrow(allGroup),allGroup[,xx],allSd[,sub('alleleGroup\\[[0-9]+,','sdGroup[',xx)],3)))
+  #xRange<-quantile(allGroup,c(.005,.995))
+  xRange<-log(c(1e-6,.5))
+  denses<-apply(allGroup,2,density)
+  yLim<-c(0,max(sapply(denses,function(xx)max(xx$y))))
+  for(jj in fit$alleleId){
+    for(ii in fit$groupId){
+      thisCol<-sprintf('alleleGroup[%d,%d]',jj,ii)
+      thisDat<-denses[[thisCol]]
+      thisVirusIds<-fit$virusId[names(fit$virusGroup)[fit$virusGroup==ii]]
+      thisVirus<-mat[,sprintf('alleleVirus[%d,%d]',thisVirusIds,jj)]
+      virDense<-apply(thisVirus,2,density)
+      plot(1,1,type='n',xaxt='n',yaxt='n',xlab='',ylab='',xlim=exp(xRange),ylim=yLim,log='x',yaxs='i')
+      #plot(1,1,type='n',xaxt='n',yaxt='n',xlab='',ylab='',xlim=exp(xRange),ylim=c(-yLim[2],yLim[2]),log='x')
+      #polygon(exp(thisDat$x),thisDat$y,col='#0000FF33')
+      #lapply(virDense,function(xx)polygon(exp(xx$x),-xx$y,col='#00000022',border='#00000011'))
+      lapply(virDense,function(xx)polygon(exp(xx$x),xx$y,col='#00000011',border='#00000022'))
+      polygon(exp(plusSd[[thisCol]]$x),plusSd[[thisCol]]$y,col='#FF000099')
+      if(jj==1)mtext(names(fit$groupId)[ii],2,xpd=NA,line=.5)
+      if(jj==1&ii==2)mtext('Probability density',2,xpd=NA,cex=1.2,line=3)
+      if(ii==1)mtext(names(fit$alleleId)[jj],3,xpd=NA,line=-2)
+      if(ii==nGroup)dnar::logAxis(1,axisVals=c(-6,-4,-2))
+      if(ii==nGroup&jj==4)mtext('Proportion positive cells',1,xpd=NA,line=3)
+    }
+  }
+dev.off()
+
+save(fit,file='monkeyDiff.Rdat')
+
+
+stanCode3<-'
+  data {
+    int<lower=0> nVirus;
+    int<lower=0> nAllele;
+    int<lower=0> nRep;
+    int<lower=0> nGroup;
+    int<lower=0> nExperiment;
+    vector[nRep] rep;
+    int<lower=0> allele[nRep];
+    int<lower=0> virus[nRep];
+    int<lower=0> virusGroup[nVirus];
+    int<lower=0> experiment[nRep];
+    real backMean;
+    real<lower=0> backSd;
+    real<lower=0> tNu;
+  }
+  parameters {
+    matrix[nVirus,nAllele] alleleVirus;
+    matrix[nVirus,nExperiment-1] virusExperiment;
+    matrix[nAllele,nGroup] alleleGroup;
+    real<lower=0> sdWithinSpecies;
+    real<lower=0> repSd;
+    vector<lower=0>[nRep] background;
+    real<lower=0> alleleSd;
+    vector[nAllele] sdMult;
+    vector[nAllele] alleleMeans;
+    vector[nVirus] virusMeans;
+    //real<lower=0> alleleSdScale;
+    //real<lower=0> alleleMeansSd;
+    //real alleleMeansMean;
+  }
+  transformed parameters{
+    vector[nRep] beta;
+    for(ii in 1:nRep){
+      beta[ii]=alleleVirus[virus[ii],allele[ii]]+virusMeans[virus[ii]];
+      if(experiment[ii]!=1)beta[ii]=beta[ii]+virusExperiment[virus[ii],experiment[ii]-1];
+      beta[ii]=logit(fmin(inv_logit(beta[ii])+background[ii],.9999));
+    }
+  }
+  model {
+    rep~normal(beta,repSd);
+    //for(ii in 1:nVirus)alleleVirus[ii,]~student_t(tNu,alleleGroup[,virusGroup[ii]],sdWithinSpecies);
+    for(ii in 1:nVirus)alleleVirus[ii,]~normal(alleleGroup[,virusGroup[ii]],sdWithinSpecies);
+    for(ii in 1:nAllele)alleleGroup[ii,]~normal(alleleMeans[ii],alleleSd*exp(sdMult[ii]));
+    for(ii in 2:nExperiment)virusExperiment[,ii-1]~normal(0,5);
+    repSd~gamma(1,.1);
+    alleleSd~gamma(1,.1);
+    sdMult~normal(0,.693); //log(2)
+    background~normal(backMean,backSd);
+    alleleMeans~normal(-2,2.5);
+    //alleleMeansMean~normal(-2,5);
+    virusMeans~normal(0,2);
+    sdWithinSpecies~gamma(1,.1);
+    //alleleMeansSd~gamma(1,.1);
+  }
+'
+modAllele3 <- stan_model(model_code = stanCode3)
+
+fitMonk<-dnar::withAs(xx=monk[monk$virus!='Mock'&!is.na(monk$rep),],fitModel(xx$virus,xx$allele,xx$species,xx$repNo0,xx$date,mocks,modAllele3,chains=50,nIter=10000,logFunc=logit))
+print(fit6$fit,'alleleMeansSd')
+pdf('monkDiff3.pdf',height=10,width=8)
+plotFit(fit5)
+dev.off()
+
+fitGor<-dnar::withAs(xx=gor[!grepl('Mock',gor$virus)&!is.na(gor$rep)&!grepl('Bonobo|N15T',gor$allele),],fitModel(xx$virus,xx$allele,xx$species,xx$rep,xx$date,mocks,modAllele3,chains=50,nIter=30000,logFunc=logit))
+fitCpz<-dnar::withAs(xx=gor[!grepl('Mock',gor$virus)&!is.na(gor$rep)&grepl('Bonobo|Human',gor$allele),],fitModel(xx$virus,xx$allele,xx$species,xx$rep,xx$date,mocks,modAllele3,chains=50,nIter=30000,logFunc=logit))
+
+pdf('alleleGroup3.pdf',width=10,height=10)
+plotAlleles(fitMonk,xRange=log(c(1e-9,1)),isT=FALSE,expFunc=boot::inv.logit,sdMult=TRUE)
+dev.off()
+mat<-as.matrix(fit5$fit)
+alMeans<-mat[,grepl('alleleMeans\\[',colnames(mat))]
+apply(alMeans,2,mean)
+meanDiffs<-do.call(rbind,lapply(structure(colnames(alMeans),.Names=colnames(alMeans)),function(xx){do.call(rbind,lapply(structure(colnames(alMeans),.Names=colnames(alMeans)),function(yy){
+  tmp<-crIMean(mat[,xx]-mat[,yy])
+  pr<-mean((mat[,xx]-mat[,yy])<0)
+  out<-data.frame('allele1'=xx,'allele2'=yy,'foldDiff'=exp(tmp[3]),'lowerCrI'=exp(tmp[1]),'upperCrI'=exp(tmp[2]),'probLess'=pr)
+}))}))
+meanDiffs$all1<-names(fit$alleleId)[as.numeric(sub('alleleMeans\\[([0-9]+)\\]','\\1',meanDiffs$allele1))]
+meanDiffs$all2<-names(fit$alleleId)[as.numeric(sub('alleleMeans\\[([0-9]+)\\]','\\1',meanDiffs$allele2))]
+rownames(meanDiffs)<-NULL
+meanDiffs$diff<-apply(meanDiffs[,c('lowerCrI','upperCrI')],1,dnar::conservativeBoundary,base=1)
+
+pdf('monkDiff4.pdf',height=10,width=8)
+  plotFit(fitMonk,means)
+dev.off()
+
+
+zz<-rnorm(100000,mean(mocks/100),sd(mocks/100))
+pdf('test.pdf');hist(mat[,'background[1]']);hist(mat[,'background[123]']);hist(mocks/100);hist(zz[zz>0]);dev.off()
